@@ -1,0 +1,480 @@
+
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ArtemisNexus — Spacecraft Matrix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{--bg:#020810;--panel:rgba(4,18,35,.93);--card:rgba(6,24,46,.88);--c:#00e5ff;--cd:rgba(0,229,255,.12);--cg:rgba(0,229,255,.4);--or:#ff6b2b;--gr:#00ff88;--re:#ff2b55;--ye:#ffc040;--pu:#b060ff;--t1:#e8f4ff;--t2:#7eb8d4;--t3:#3a6b87;--bo:rgba(0,229,255,.15);--bb:rgba(0,229,255,.45);--fd:'Orbitron',monospace;--fm:'Share Tech Mono',monospace;--fb:'Exo 2',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t1);font-family:var(--fb);min-height:100vh;overflow-x:hidden;cursor:crosshair}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(1px 1px at 8% 12%,rgba(255,255,255,.5) 0%,transparent 100%),radial-gradient(1px 1px at 22% 45%,rgba(255,255,255,.3) 0%,transparent 100%),radial-gradient(1.5px 1.5px at 68% 28%,rgba(0,229,255,.4) 0%,transparent 100%),radial-gradient(1px 1px at 84% 62%,rgba(0,229,255,.3) 0%,transparent 100%),radial-gradient(1px 1px at 52% 78%,rgba(255,255,255,.4) 0%,transparent 100%);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.01) 2px,rgba(0,229,255,.01) 4px);pointer-events:none;z-index:999}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--cd)}
+
+/* HEADER */
+.hdr{position:relative;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:rgba(2,8,20,.97);border-bottom:1px solid var(--bb);box-shadow:0 0 30px rgba(0,229,255,.1);flex-wrap:wrap;gap:8px}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-icon{width:36px;height:36px;border:2px solid var(--c);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px var(--cg),inset 0 0 15px var(--cd);animation:pulse 3s ease-in-out infinite}
+.logo-icon::before{content:'';width:11px;height:11px;background:var(--c);border-radius:50%;box-shadow:0 0 12px var(--c);animation:core 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 15px var(--cg),inset 0 0 15px var(--cd)}50%{box-shadow:0 0 28px var(--cg),inset 0 0 22px var(--cd)}}
+@keyframes core{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+.logo-text{font-family:var(--fd);font-size:20px;font-weight:900;letter-spacing:3px;color:var(--c);text-shadow:0 0 20px var(--cg)}
+.logo-sub{font-family:var(--fm);font-size:9px;color:var(--t2);letter-spacing:3px;margin-top:1px}
+nav{display:flex;flex-wrap:wrap;gap:2px}
+nav a{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;color:var(--t2);text-decoration:none;padding:7px 11px;border:1px solid transparent;transition:all .25s;text-transform:uppercase;position:relative}
+nav a:hover,nav a.active{color:var(--c);border-color:var(--bo);background:var(--cd)}
+nav a.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--c);box-shadow:0 0 6px var(--c)}
+.hdr-right{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.hdr-stat{font-family:var(--fm);font-size:9px;color:var(--t3);letter-spacing:1px}
+.hdr-stat span{color:var(--c);display:block;font-size:10px}
+.live{display:flex;align-items:center;gap:7px;font-family:var(--fm);font-size:10px;color:var(--gr);letter-spacing:2px}
+.live-dot{width:7px;height:7px;background:var(--gr);border-radius:50%;box-shadow:0 0 8px var(--gr);animation:blink 1.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* TICKER */
+.ticker{background:rgba(0,229,255,.05);border-bottom:1px solid var(--bo);padding:5px 0;overflow:hidden;position:relative;z-index:10}
+.ticker-inner{display:flex;gap:60px;animation:scroll 35s linear infinite;white-space:nowrap;font-family:var(--fm);font-size:9px;color:var(--t2)}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tc{color:var(--c)}.tw{color:var(--ye)}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:240px 1fr 280px;height:calc(100vh - 88px);position:relative;z-index:5}
+
+/* LEFT SIDEBAR */
+.sidebar-l{background:var(--panel);border-right:1px solid var(--bo);padding:14px 12px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.sec-hdr{font-family:var(--fd);font-size:8px;letter-spacing:3px;color:var(--c);padding-bottom:7px;border-bottom:1px solid var(--bo);opacity:.8;margin-bottom:4px}
+.sc-item{padding:8px 10px;border:1px solid transparent;cursor:pointer;transition:all .2s;font-family:var(--fm)}
+.sc-item:hover{background:var(--cd);border-color:var(--bo)}
+.sc-item-name{font-size:10px;color:var(--t1);letter-spacing:.5px;margin-bottom:3px}
+.sc-item-sub{font-size:8px;color:var(--t3);display:flex;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;margin-top:1px}
+.dot-active{background:var(--gr);box-shadow:0 0 6px var(--gr)}
+.dot-offline{background:var(--t3)}
+.dot-standby{background:var(--ye);box-shadow:0 0 6px var(--ye)}
+.dot-planned{background:var(--pu);box-shadow:0 0 6px var(--pu)}
+.mini-stat{display:flex;justify-content:space-between;padding:4px 0;font-family:var(--fm);font-size:9px;border-bottom:1px solid rgba(0,229,255,.05)}
+.mini-stat-l{color:var(--t3);letter-spacing:1px}
+.mini-stat-v{color:var(--c)}
+
+/* CENTER */
+.center-col{display:flex;flex-direction:column;overflow:hidden}
+
+/* ISS canvas strip */
+.iss-strip{position:relative;height:180px;background:#000;border-bottom:1px solid var(--bo);flex-shrink:0;overflow:hidden}
+#issCanvas{position:absolute;inset:0;width:100%;height:100%}
+.iss-overlay{position:absolute;inset:0;pointer-events:none}
+.iss-overlay::before,.iss-overlay::after{content:'';position:absolute;width:16px;height:16px;border-color:var(--c);border-style:solid;opacity:.5}
+.iss-overlay::before{top:10px;left:10px;border-width:2px 0 0 2px}
+.iss-overlay::after{bottom:10px;right:10px;border-width:0 2px 2px 0}
+.iss-label{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:var(--fd);font-size:8px;letter-spacing:3px;color:var(--c);opacity:.6}
+.iss-pos{position:absolute;bottom:10px;left:14px;font-family:var(--fm);font-size:8px;color:rgba(0,229,255,.5);line-height:1.7}
+.iss-info{position:absolute;bottom:10px;right:14px;font-family:var(--fm);font-size:8px;color:rgba(0,229,255,.5);text-align:right;line-height:1.7}
+
+/* Stats bar */
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--bo);flex-shrink:0;background:rgba(2,8,20,.95)}
+.stat-cell{padding:10px 8px;border-right:1px solid var(--bo);text-align:center}
+.stat-cell:last-child{border-right:none}
+.stat-val{font-family:var(--fd);font-size:18px;font-weight:700;line-height:1;text-shadow:0 0 12px currentColor}
+.stat-lbl{font-family:var(--fm);font-size:7px;color:var(--t3);letter-spacing:2px;margin-top:4px}
+.sv-c{color:var(--c)}.sv-g{color:var(--gr)}.sv-o{color:var(--or)}.sv-y{color:var(--ye)}.sv-p{color:var(--pu)}
+
+/* Controls */
+.ctrl-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--bo);flex-shrink:0;flex-wrap:wrap}
+.fbtn{font-family:var(--fm);font-size:8px;letter-spacing:1px;padding:5px 12px;border:1px solid var(--bo);color:var(--t2);cursor:pointer;transition:all .25s;background:transparent;text-transform:uppercase}
+.fbtn:hover,.fbtn.active,.fbtn[class*="active"]{background:var(--cd);color:var(--c);border-color:rgba(0,229,255,.4)}
+.search{background:rgba(6,24,46,.8);border:1px solid var(--bo);color:var(--t1);font-family:var(--fm);font-size:10px;padding:5px 10px;outline:none;transition:border-color .25s;letter-spacing:1px}
+.search::placeholder{color:var(--t3)}.search:focus{border-color:var(--c)}
+.sel{background:rgba(6,24,46,.8);border:1px solid var(--bo);color:var(--t2);font-family:var(--fm);font-size:9px;padding:5px 10px;outline:none;cursor:pointer}
+.sel option{background:#04121f}
+
+/* Table */
+.tbl-wrap{flex:1;overflow-y:auto}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--bo);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5}
+.tbl-title{font-family:var(--fd);font-size:8px;letter-spacing:3px;color:var(--c);opacity:.8}
+.tbl-count{font-family:var(--fm);font-size:9px;color:var(--t3)}
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--fm);font-size:8px;letter-spacing:2px;color:var(--t3);padding:8px 14px;text-align:left;border-bottom:1px solid var(--bo);background:rgba(4,14,30,.7)}
+td{font-family:var(--fm);font-size:9px;padding:9px 14px;color:var(--t2);border-bottom:1px solid rgba(0,229,255,.04)}
+tr{transition:background .2s}
+tr:hover td{background:rgba(0,229,255,.04)}
+.td-name{color:var(--t1);letter-spacing:.5px}
+.td-c{color:var(--c)}.td-g{color:var(--gr)}.td-o{color:var(--or)}.td-y{color:var(--ye)}
+.badge{font-family:var(--fm);font-size:7px;padding:2px 7px;border-radius:2px;letter-spacing:1px}
+.b-active{background:rgba(0,255,136,.12);color:var(--gr);border:1px solid rgba(0,255,136,.3)}
+.b-offline{background:rgba(60,40,50,.4);color:#886688;border:1px solid rgba(100,60,70,.4)}
+.b-standby{background:rgba(255,192,64,.12);color:var(--ye);border:1px solid rgba(255,192,64,.3)}
+.b-planned{background:rgba(176,96,255,.12);color:var(--pu);border:1px solid rgba(176,96,255,.3)}
+
+/* RIGHT PANEL */
+.sidebar-r{background:var(--panel);border-left:1px solid var(--bo);overflow-y:auto;padding:0}
+.det-panel{padding:14px;border-bottom:1px solid var(--bo)}
+.det-name{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--c);letter-spacing:2px;margin-bottom:2px;text-shadow:0 0 10px var(--cg)}
+.det-type{font-family:var(--fm);font-size:8px;color:var(--t3);letter-spacing:2px;margin-bottom:10px}
+.drow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(0,229,255,.05);font-family:var(--fm);font-size:9px}
+.drow-l{color:var(--t3);letter-spacing:1px}.drow-v{color:var(--t2)}
+.bar-wrap{margin:5px 0}.bar-lbl{display:flex;justify-content:space-between;font-family:var(--fm);font-size:8px;color:var(--t3);margin-bottom:3px}
+.bar{height:3px;background:rgba(255,255,255,.07)}.bar-fill{height:100%}
+.bf-c{background:linear-gradient(90deg,var(--c),rgba(0,229,255,.4));box-shadow:0 0 5px var(--c)}
+.bf-g{background:linear-gradient(90deg,var(--gr),rgba(0,255,136,.4));box-shadow:0 0 5px var(--gr)}
+.bf-o{background:linear-gradient(90deg,var(--or),rgba(255,107,43,.4));box-shadow:0 0 5px var(--or)}
+.chart-box{padding:12px;border-bottom:1px solid var(--bo)}
+.chart-title{font-family:var(--fd);font-size:7px;letter-spacing:2px;color:var(--c);margin-bottom:8px;opacity:.8}
+.chart-wrap{height:120px;position:relative}
+.crew-item{display:flex;justify-content:space-between;padding:5px 12px;border-bottom:1px solid rgba(0,229,255,.04);font-family:var(--fm);font-size:9px}
+.crew-name{color:var(--t2)}.crew-craft{color:var(--c);font-size:8px}
+
+/* Anim */
+@keyframes fadein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:fadein .4s ease forwards;opacity:0}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="logo">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text">ArtemisNexus</div>
+      <div class="logo-sub">SPACECRAFT MATRIX</div>
+    </div>
+  </div>
+  <nav>
+    <a href="/">MISSION CTRL</a>
+    <a href="/mars">MARS ROVER</a>
+    <a href="/deep-space">DEEP SPACE</a>
+    <a href="/asteroids">ASTEROIDS</a>
+    <a href="/solarsystembodies">SOLAR BODIES</a>
+    <a href="/spacecraft" class="active">SPACECRAFT</a>
+    <a href="/spaceprobes">PROBES</a>
+    <a href="/telescope">TELESCOPES</a>
+    <a href="/mission">MISSIONS DB</a>
+    <a href="/upcomingmissions">LAUNCHES</a>
+  </nav>
+  <div class="hdr-right">
+    <div class="hdr-stat">API SOURCE<span>MOCK DATA</span></div>
+    <div class="hdr-stat">HARDWARE<span id="hwCount">—</span></div>
+    <div class="live"><div class="live-dot"></div>SYNCED</div>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span><span class="tc">▶ ROSCOSMOS:</span> Soyuz MS-25 docking port confirmed</span>
+    <span><span class="tc">▶ NASA:</span> Orion thermal shields cleared for Artemis II</span>
+    <span><span class="tc">▶ SPACEX:</span> Crew Dragon Endeavour approaching ISS</span>
+    <span><span class="tc">▶ ESA:</span> BepiColombo Mercury orbit insertion T-180 days</span>
+    <span><span class="tc">▶ ISRO:</span> Aditya-L1 solar wind measurement nominal</span>
+    <!-- duplicate for seamless loop -->
+    <span><span class="tc">▶ ROSCOSMOS:</span> Soyuz MS-25 docking port confirmed</span>
+    <span><span class="tc">▶ NASA:</span> Orion thermal shields cleared for Artemis II</span>
+    <span><span class="tc">▶ SPACEX:</span> Crew Dragon Endeavour approaching ISS</span>
+    <span><span class="tc">▶ ESA:</span> BepiColombo Mercury orbit insertion T-180 days</span>
+    <span><span class="tc">▶ ISRO:</span> Aditya-L1 solar wind measurement nominal</span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <aside class="sidebar-l">
+    <div class="sec-hdr">● RECENT HARDWARE</div>
+    <div id="scList"></div>
+    <div class="sec-hdr" style="margin-top:8px;">● FLEET SUMMARY</div>
+    <div class="mini-stat"><span class="mini-stat-l">ACTIVE</span><span class="mini-stat-v" id="flt-a">—</span></div>
+    <div class="mini-stat"><span class="mini-stat-l">STATIONS</span><span class="mini-stat-v" id="flt-s">—</span></div>
+    <div class="mini-stat"><span class="mini-stat-l">CREWED</span><span class="mini-stat-v" id="flt-c">—</span></div>
+    <div class="mini-stat"><span class="mini-stat-l">TOTAL</span><span class="mini-stat-v" id="flt-t">—</span></div>
+  </aside>
+
+  <!-- CENTER -->
+  <main class="center-col">
+    <!-- ISS Canvas -->
+    <div class="iss-strip">
+      <canvas id="issCanvas"></canvas>
+      <div class="iss-overlay"></div>
+      <div class="iss-label">ISS LIVE GROUND TRACK — OPEN NOTIFY API</div>
+      <div class="iss-pos">
+        LAT: <span id="issLat">LOADING…</span><br>
+        LON: <span id="issLon">—</span><br>
+        ALT: 408 km
+      </div>
+      <div class="iss-info">
+        ORBIT: 92 min<br>
+        SPEED: 7.66 km/s<br>
+        INC: 51.6°
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-cell"><div class="stat-val sv-g" id="st-total">—</div><div class="stat-lbl">TOTAL HARDWARE</div></div>
+      <div class="stat-cell"><div class="stat-val sv-c" id="st-active">—</div><div class="stat-lbl">OPERATING</div></div>
+      <div class="stat-cell"><div class="stat-val sv-o" id="st-stations">—</div><div class="stat-lbl">ACTIVE STATUS</div></div>
+      <div class="stat-cell"><div class="stat-val sv-p" id="st-crewed">—</div><div class="stat-lbl">CREWED CRAFT</div></div>
+      <div class="stat-cell"><div class="stat-val sv-y" id="st-agencies">—</div><div class="stat-lbl">AGENCIES</div></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="ctrl-bar">
+      <form method="get" action="/spacecraft" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <button type="button" class="fbtn active" onclick="filterSC('all', this)">ALL HARDWARE</button>
+        <button type="button" class="fbtn" onclick="filterSC('Active', this)">ACTIVE</button>
+        <button type="button" class="fbtn" onclick="filterSC('Offline', this)">OFFLINE</button>
+        <select class="sel" id="agencyFilter" onchange="filterSC('agency', null)">
+          <option value="">ALL AGENCIES</option>
+          <option>NASA</option><option>SpaceX</option><option>ESA</option>
+          <option>ISRO</option><option>CNSA</option><option>ROSCOSMOS</option>
+        </select>
+        <input type="text" id="scSearch" class="search" placeholder="SEARCH HARDWARE…" style="width:180px;" oninput="filterSC('search',null)">
+        <button type="button" class="fbtn">▶ SEARCH</button>
+      </form>
+    </div>
+
+    <!-- Table (populated by Thymeleaf from MongoDB) -->
+    <div class="tbl-wrap">
+      <div class="tbl-top">
+        <span class="tbl-title">● HARDWARE DATABASE</span>
+        <span class="tbl-count" id="scCount">—</span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>SPACECRAFT</th><th>TYPE</th><th>AGENCY</th>
+          <th>DESTINATION</th><th>NET (DATE)</th><th>STATUS</th>
+        </tr></thead>
+        <tbody id="scTable"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <aside class="sidebar-r">
+    <div class="sec-hdr" style="padding:12px 14px;border-bottom:1px solid var(--bo);">● FLEET DETAILS</div>
+    <div class="det-panel" id="detPanel">
+      <div class="det-name">ISS</div>
+      <div class="det-type">Space Station · International</div>
+      <div class="drow"><span class="drow-l">ORBIT</span><span class="drow-v">LEO 408 km</span></div>
+      <div class="drow"><span class="drow-l">ALTITUDE</span><span class="drow-v">408 km</span></div>
+      <div class="drow"><span class="drow-l">STATUS</span><span class="drow-v">Active</span></div>
+      <div class="drow"><span class="drow-l">LAUNCH</span><span class="drow-v">1998-11-20</span></div>
+      <div class="drow"><span class="drow-l">CREW</span><span class="drow-v">7 ABOARD</span></div>
+      <div class="drow"><span class="drow-l">MASS</span><span class="drow-v">420,000 kg</span></div>
+      <div class="bar-wrap">
+        <div class="bar-lbl"><span>POWER</span><span>98%</span></div>
+        <div class="bar"><div class="bar-fill bf-g" style="width:98%"></div></div>
+      </div>
+    </div>
+
+    <!-- Agency distribution chart -->
+    <div class="chart-box">
+      <div class="chart-title">▸ CRAFT BY AGENCY</div>
+      <div class="chart-wrap"><canvas id="agChart"></canvas></div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-title">▸ STATUS DISTRIBUTION</div>
+      <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    </div>
+
+    <!-- Crew manifest -->
+    <div class="sec-hdr" style="padding:10px 14px 0;border-top:1px solid var(--bo);">● CREW IN SPACE NOW</div>
+    <div id="crewList" style="padding:0 0 10px;">
+      <div class="crew-item"><span class="crew-name">Loading…</span></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+// ── ISS LIVE TRACKING ────────────────────────────────────────
+const ic = document.getElementById('issCanvas');
+const ictx = ic.getContext('2d');
+let issLat = 20, issLon = 80;
+
+async function fetchISS() {
+  try {
+    const r = await fetch('/proxy/iss');
+    const d = await r.json();
+    issLat = parseFloat(d.iss_position.latitude);
+    issLon = parseFloat(d.iss_position.longitude);
+    document.getElementById('issLat').textContent = issLat.toFixed(2) + '°';
+    document.getElementById('issLon').textContent = issLon.toFixed(2) + '°';
+  } catch(e) {
+    // Simulate movement when API unavailable
+    issLat = ((issLat + 0.5) % 180) - 90;
+    issLon = (issLon + 2.5) % 360 - 180;
+    document.getElementById('issLat').textContent = issLat.toFixed(2) + '° (SIM)';
+    document.getElementById('issLon').textContent = issLon.toFixed(2) + '°';
+  }
+}
+
+function drawISS() {
+  ic.width = ic.parentElement.offsetWidth;
+  ic.height = ic.parentElement.offsetHeight;
+  const w = ic.width, h = ic.height;
+  ictx.clearRect(0, 0, w, h);
+  // Grid
+  ictx.strokeStyle = 'rgba(0,229,255,.06)'; ictx.lineWidth = 1;
+  for(let i=0;i<7;i++){ictx.beginPath();ictx.moveTo(0,i*h/6);ictx.lineTo(w,i*h/6);ictx.stroke();}
+  for(let i=0;i<13;i++){ictx.beginPath();ictx.moveTo(i*w/12,0);ictx.lineTo(i*w/12,h);ictx.stroke();}
+  // Orbit arc
+  ictx.beginPath(); ictx.ellipse(w/2,h/2,w*.44,h*.38,0,0,Math.PI*2);
+  ictx.strokeStyle='rgba(0,229,255,.12)'; ictx.lineWidth=1; ictx.setLineDash([4,8]); ictx.stroke(); ictx.setLineDash([]);
+  // ISS position
+  const ix = ((issLon + 180) / 360) * w;
+  const iy = ((90 - issLat) / 180) * h;
+  const g = ictx.createRadialGradient(ix,iy,0,ix,iy,16);
+  g.addColorStop(0,'rgba(0,229,255,.5)'); g.addColorStop(1,'transparent');
+  ictx.fillStyle=g; ictx.beginPath(); ictx.arc(ix,iy,16,0,Math.PI*2); ictx.fill();
+  ictx.beginPath(); ictx.arc(ix,iy,5,0,Math.PI*2); ictx.fillStyle='#00e5ff'; ictx.fill();
+  ictx.fillStyle='rgba(0,229,255,.8)'; ictx.font="8px 'Share Tech Mono'";
+  ictx.fillText('ISS',ix+8,iy-6);
+}
+
+fetchISS(); drawISS();
+setInterval(fetchISS, 5000);
+window.addEventListener('resize', drawISS);
+
+// ── CREW MANIFEST ─────────────────────────────────────────────
+fetch('/proxy/astros')
+  .then(r=>r.json())
+  .then(data => {
+    document.getElementById('crewList').innerHTML =
+      data.people.map(p =>
+        `<div class="crew-item"><span class="crew-name">${p.name}</span><span class="crew-craft">${p.craft}</span></div>`
+      ).join('') +
+      `<div style="padding:4px 12px;font-family:var(--fm);font-size:8px;color:var(--t3);">${data.number} HUMANS IN SPACE</div>`;
+  })
+  .catch(() => {
+    document.getElementById('crewList').innerHTML =
+      '<div class="crew-item"><span class="crew-name" style="color:var(--t3)">API OFFLINE — USING CACHED DATA</span></div>' +
+      ['Oleg Kononenko','Tracy Dyson','Suni Williams','Butch Wilmore','Nikolai Chub'].map(n=>
+        `<div class="crew-item"><span class="crew-name">${n}</span><span class="crew-craft">ISS</span></div>`
+      ).join('');
+  });
+
+// ── SPACECRAFT DATASET ────────────────────────────────────────
+const ALL_SC = [
+  {name:'ISS', type:'Space Station', agency:'International', dest:'LEO', launch:'1998-11-20', status:'Active', crew:7, orbit:'LEO 408 km', mass:'420,000 kg', pct:98},
+  {name:'Dragon Endurance', type:'Crew Capsule', agency:'SpaceX', dest:'ISS', launch:'2022-10-05', status:'Active', crew:4, orbit:'LEO', mass:'12,519 kg', pct:95},
+  {name:'Starliner', type:'Crew Capsule', agency:'Boeing/NASA', dest:'ISS', launch:'2024-05-06', status:'Standby', crew:0, orbit:'LEO', mass:'13,000 kg', pct:60},
+  {name:'Tiangong CSS', type:'Space Station', agency:'CNSA', dest:'LEO', launch:'2021-04-29', status:'Active', crew:3, orbit:'LEO 390 km', mass:'100,000 kg', pct:92},
+  {name:'Orion Capsule', type:'Crewed Spacecraft', agency:'NASA', dest:'Moon', launch:'2022-11-16', status:'Standby', crew:0, orbit:'Storage', mass:'25,848 kg', pct:45},
+  {name:'Perseverance Rover', type:'Mars Rover', agency:'NASA', dest:'Mars', launch:'2020-07-30', status:'Active', crew:0, orbit:'Surface', mass:'1,025 kg', pct:84},
+  {name:'Curiosity Rover', type:'Mars Rover', agency:'NASA', dest:'Mars', launch:'2011-11-26', status:'Active', crew:0, orbit:'Surface', mass:'899 kg', pct:71},
+  {name:'JWST', type:'Space Telescope', agency:'NASA/ESA', dest:'L2 Point', launch:'2021-12-25', status:'Active', crew:0, orbit:'L2 Halo', mass:'6,200 kg', pct:99},
+  {name:'Hubble', type:'Space Telescope', agency:'NASA/ESA', dest:'LEO', launch:'1990-04-24', status:'Active', crew:0, orbit:'LEO 537 km', mass:'11,110 kg', pct:87},
+  {name:'Europa Clipper', type:'Orbiter', agency:'NASA', dest:'Jupiter/Europa', launch:'2024-10-14', status:'Active', crew:0, orbit:'En Route', mass:'6,065 kg', pct:100},
+  {name:'JUICE', type:'Orbiter', agency:'ESA', dest:'Jupiter', launch:'2023-04-14', status:'Active', crew:0, orbit:'En Route', mass:'5,963 kg', pct:100},
+  {name:'Chandrayaan-3 Lander', type:'Lunar Lander', agency:'ISRO', dest:'Moon', launch:'2023-07-14', status:'Offline', crew:0, orbit:'Surface', mass:'1,726 kg', pct:0},
+  {name:'Aditya-L1', type:'Solar Observatory', agency:'ISRO', dest:'L1 Point', launch:'2023-09-02', status:'Active', crew:0, orbit:'L1 Halo', mass:'1,480 kg', pct:91},
+  {name:'BepiColombo', type:'Orbiter', agency:'ESA/JAXA', dest:'Mercury', launch:'2018-10-20', status:'Active', crew:0, orbit:'En Route', mass:'4,100 kg', pct:88},
+];
+
+let scFiltered = [...ALL_SC], scStatusF = 'all', scAgencyF = '';
+
+function initSC() {
+  const active = ALL_SC.filter(s=>s.status==='Active').length;
+  const stations = ALL_SC.filter(s=>s.type.includes('Station')).length;
+  const crewed = ALL_SC.filter(s=>s.crew>0).length;
+  const agencies = new Set(ALL_SC.map(s=>s.agency.split('/')[0])).size;
+  document.getElementById('hwCount').textContent = ALL_SC.length;
+  document.getElementById('flt-t').textContent = ALL_SC.length;
+  document.getElementById('flt-a').textContent = active;
+  document.getElementById('flt-s').textContent = stations;
+  document.getElementById('flt-c').textContent = crewed;
+  document.getElementById('st-total').textContent = ALL_SC.length;
+  document.getElementById('st-active').textContent = active;
+  document.getElementById('st-stations').textContent = stations;
+  document.getElementById('st-crewed').textContent = crewed;
+  document.getElementById('st-agencies').textContent = agencies;
+  document.getElementById('scList').innerHTML = ALL_SC.slice(0,8).map(s=>`
+    <div class="sc-item anim" onclick="showDet('${s.name}')">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+        <div class="dot dot-${s.status==='Active'?'active':s.status==='Offline'?'offline':s.status==='Standby'?'standby':'planned'}"></div>
+        <div class="sc-item-name">${s.name}</div>
+      </div>
+      <div class="sc-item-sub"><span>${s.type}</span><span>${s.status}</span></div>
+    </div>`).join('');
+  renderSCTable();
+}
+
+function showDet(name) {
+  const s = ALL_SC.find(x=>x.name===name); if(!s) return;
+  document.getElementById('detPanel').innerHTML = `
+    <div class="det-name">${s.name}</div>
+    <div class="det-type">${s.type} &middot; ${s.agency}</div>
+    <div class="drow"><span class="drow-l">ORBIT</span><span class="drow-v">${s.orbit}</span></div>
+    <div class="drow"><span class="drow-l">STATUS</span><span class="drow-v">${s.status}</span></div>
+    <div class="drow"><span class="drow-l">LAUNCH</span><span class="drow-v">${s.launch}</span></div>
+    <div class="drow"><span class="drow-l">CREW</span><span class="drow-v">${s.crew>0?s.crew+' ABOARD':'UNCREWED'}</span></div>
+    <div class="drow"><span class="drow-l">MASS</span><span class="drow-v">${s.mass}</span></div>
+    <div class="drow"><span class="drow-l">DESTINATION</span><span class="drow-v">${s.dest}</span></div>
+    ${s.pct>0?`<div class="bar-wrap"><div class="bar-lbl"><span>POWER</span><span>${s.pct}%</span></div><div class="bar"><div class="bar-fill bf-g" style="width:${s.pct}%"></div></div></div>`:''}
+  `;
+}
+
+function renderSCTable() {
+  document.getElementById('scCount').textContent = scFiltered.length+' VEHICLES';
+  const bmap = {Active:'b-active',Offline:'b-offline',Standby:'b-standby',Planned:'b-planned'};
+  document.getElementById('scTable').innerHTML = scFiltered.map(s=>`
+    <tr onclick="showDet('${s.name}')">
+      <td class="td-name">${s.name}</td>
+      <td>${s.type}</td>
+      <td class="td-o">${s.agency}</td>
+      <td class="td-c">${s.dest}</td>
+      <td>${s.launch}</td>
+      <td><span class="badge ${bmap[s.status]||'b-standby'}">${s.status}</span></td>
+    </tr>`).join('');
+}
+
+function filterSC(mode, btn) {
+  if(btn){document.querySelectorAll('.ctrl-bar .fbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+  if(mode==='Active'||mode==='Offline') scStatusF=mode; else if(mode==='all') scStatusF='all';
+  const ag = document.getElementById('agencyFilter').value;
+  const q = document.getElementById('scSearch').value.toLowerCase();
+  scFiltered = ALL_SC.filter(s=>{
+    if(scStatusF!=='all'&&s.status!==scStatusF) return false;
+    if(ag&&!s.agency.includes(ag)) return false;
+    if(q&&!s.name.toLowerCase().includes(q)&&!s.type.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  renderSCTable();
+}
+
+initSC();
+
+// ── CHARTS ────────────────────────────────────────────────────
+const agCounts = {}; ALL_SC.forEach(s=>{ const a=s.agency.split('/')[0]; agCounts[a]=(agCounts[a]||0)+1; });
+new Chart(document.getElementById('agChart'), {
+  type: 'doughnut',
+  data: {
+    labels: Object.keys(agCounts),
+    datasets: [{ data: Object.values(agCounts),
+      backgroundColor: ['rgba(0,229,255,.65)','rgba(255,107,43,.65)','rgba(0,255,136,.6)','rgba(255,192,64,.6)','rgba(176,96,255,.6)','rgba(255,48,96,.5)','rgba(0,200,200,.5)'],
+      borderColor: ['#00e5ff','#ff6b2b','#00ff88','#ffc040','#b060ff','#ff3060','#00c8c8'], borderWidth: 1.5 }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, cutout:'60%', animation:{duration:1400},
+    plugins:{legend:{labels:{color:'rgba(200,220,240,.6)',font:{family:"'Share Tech Mono'",size:8},boxWidth:10,padding:8}},
+    tooltip:{backgroundColor:'rgba(4,18,35,.95)',borderColor:'#00e5ff',borderWidth:1,titleColor:'#00e5ff',bodyColor:'rgba(200,220,240,.8)'}}}
+});
+
+const stCounts={Active:0,Standby:0,Offline:0,Planned:0};
+ALL_SC.forEach(s=>{if(stCounts[s.status]!==undefined)stCounts[s.status]++;});
+new Chart(document.getElementById('statusChart'), {
+  type: 'bar',
+  data: { labels: Object.keys(stCounts),
+    datasets:[{ data:Object.values(stCounts),
+      backgroundColor:['rgba(0,255,136,.5)','rgba(255,192,64,.5)','rgba(100,80,80,.5)','rgba(176,96,255,.5)'],
+      borderColor:['#00ff88','#ffc040','#888','#b060ff'], borderWidth:1 }]
+  },
+  options:{ responsive:true, maintainAspectRatio:false, animation:{duration:1200},
+    plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'rgba(100,140,160,.7)',font:{family:"'Share Tech Mono'",size:8}},grid:{color:'rgba(0,229,255,.06)'}},
+    y:{ticks:{color:'rgba(100,140,160,.7)',font:{family:"'Share Tech Mono'",size:8}},grid:{color:'rgba(0,229,255,.06)'}}}
+  }
+});
+</script>
+</body>
+</html>

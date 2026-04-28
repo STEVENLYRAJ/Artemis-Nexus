@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArtemisNexus — Space Probes</title>
+  <link rel="stylesheet" href="ArtemisNexus-style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="ArtemisAPI.js"></script>
+  <style>
+    .layout {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      height: calc(100vh - 70px);
+      position: relative;
+      z-index: 5;
+    }
+
+    .left-col {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .center-col {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(3, 12, 28, .9);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .table-wrap {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .tbl-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4, 14, 30, .8);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: rgba(2, 8, 20, .95);
+    }
+
+    .stats-strip .nxs-stat-big {
+      border-right: 1px solid var(--border);
+      padding: 12px 6px;
+    }
+
+    .probe-card {
+      padding: 14px;
+      border-bottom: 1px solid rgba(0, 229, 255, 0.08);
+      transition: all .2s;
+      cursor: pointer;
+    }
+
+    .probe-card:hover {
+      background: rgba(0, 229, 255, 0.05);
+    }
+
+    .p-name {
+      font-family: var(--font-display);
+      font-size: 12px;
+      color: var(--cyan);
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .p-meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="nxs-header">
+    <div class="nxs-logo">
+      <div class="nxs-logo-icon"></div>
+      <div>
+        <div class="nxs-logo-text">ArtemisNexus</div>
+        <div class="nxs-logo-sub">DEEP SPACE PROBES</div>
+      </div>
+    </div>
+    <div id="navMount"></div>
+    <div class="nxs-hdr-right">
+      <div class="nxs-stat">API SOURCE<span id="apiSource">CELESTRAK & DSN</span></div>
+      <div class="nxs-live">
+        <div class="nxs-live-dot"></div>SYNCED
+      </div>
+    </div>
+  </header>
+  <div class="nxs-ticker">
+    <div class="nxs-ticker-inner" id="ticker"></div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT PANEL -->
+    <div class="left-col">
+      <div class="nxs-panel-hdr">● ACTIVE TELEMETRY</div>
+      <div id="feedList" class="nxs-loading">
+        <div class="nxs-spinner"></div>
+      </div>
+    </div>
+
+    <!-- CENTER PANEL -->
+    <div class="center-col">
+      <div class="stats-strip">
+        <div class="nxs-stat-big">
+          <div class="val sv-cyan" id="sc-total">—</div>
+          <div class="lbl">ACTIVE PROBES</div>
+        </div>
+        <div class="nxs-stat-big">
+          <div class="val sv-orange" id="sc-speed">—</div>
+          <div class="lbl">MAX SPEED (KM/S)</div>
+        </div>
+        <div class="nxs-stat-big">
+          <div class="val sv-green" id="sc-agencies">—</div>
+          <div class="lbl">OPERATING AGENCIES</div>
+        </div>
+        <div class="nxs-stat-big">
+          <div class="val sv-purple" id="sc-dist">—</div>
+          <div class="lbl">FARTHEST PROBE (KM)</div>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <div class="nxs-filters">
+          <button class="nxs-fbtn active" onclick="filterBy('all')">ALL PROBES</button>
+          <button class="nxs-fbtn" onclick="filterBy('NASA')">NASA</button>
+          <button class="nxs-fbtn" onclick="filterBy('ESA')">ESA</button>
+          <button class="nxs-fbtn" onclick="filterBy('JAXA')">JAXA</button>
+        </div>
+        <input class="nxs-search" id="searchQ" placeholder="SEARCH PROBE..." style="width:200px;"
+          oninput="applyFilters()">
+      </div>
+
+      <div class="table-wrap">
+        <div class="tbl-top">
+          <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--cyan);opacity:.8;">●
+            TELEMETRY DATABASE</span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rcount">0 records</span>
+        </div>
+        <div id="tableLoading" class="nxs-loading">
+          <div class="nxs-spinner"></div>
+          <div class="nxs-loading-text">FETCHING DATA...</div>
+        </div>
+        <table class="nxs-table" id="dataTable" style="display:none;">
+          <thead>
+            <tr>
+              <th>PROBE</th>
+              <th>AGENCY</th>
+              <th>TYPE</th>
+              <th>REGION</th>
+              <th>LAUNCH</th>
+              <th>DIST (KM)</th>
+              <th>SPEED (KM/S)</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('spaceprobes');
+    const t = '▶ VOYAGER 1: Telemetry returning nominal packets&nbsp;&nbsp;●&nbsp;&nbsp;▶ PARKER: Preparing for perihelion pass #18&nbsp;&nbsp;●&nbsp;&nbsp;▶ JUNO: Orbit adjustment burn complete';
+    document.getElementById('ticker').innerHTML = `<span>${t}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${t}</span>`;
+
+    let allData = [
+      { name: 'Voyager 1', ag: 'NASA', type: 'Interstellar Probe', reg: 'Interstellar Medium', yr: '1977', dist: '24.1B', speed: '17.0' },
+      { name: 'Voyager 2', ag: 'NASA', type: 'Interstellar Probe', reg: 'Interstellar Medium', yr: '1977', dist: '20.1B', speed: '15.3' },
+      { name: 'Parker Solar Probe', ag: 'NASA', type: 'Solar Observatory', reg: 'Inner Solar System', yr: '2018', dist: '50M', speed: '191.0' },
+      { name: 'Juno', ag: 'NASA', type: 'Jupiter Orbiter', reg: 'Jovian System', yr: '2011', dist: '778M', speed: '50.0' },
+      { name: 'New Horizons', ag: 'NASA', type: 'KBO Explorer', reg: 'Kuiper Belt', yr: '2006', dist: '7.4B', speed: '14.0' },
+      { name: 'BepiColombo', ag: 'ESA/JAXA', type: 'Mercury Orbiter', reg: 'Inner Solar System', yr: '2018', dist: '77M', speed: '38.0' },
+      { name: 'JUICE', ag: 'ESA', type: 'Jupiter Orbiter', reg: 'Cruise Phase', yr: '2023', dist: '780M', speed: '35.0' },
+      { name: 'Hera', ag: 'ESA', type: 'Asteroid Mission', reg: 'Inner Solar System', yr: '2024', dist: '2.5AU', speed: '28.0' },
+      { name: 'Mars Odyssey', ag: 'NASA', type: 'Mars Orbiter', reg: 'Martian System', yr: '2001', dist: '225M', speed: '31.0' },
+      { name: 'Cassini (Ended)', ag: 'NASA/ESA', type: 'Saturn Orbiter', reg: 'Decommissioned', yr: '1997', dist: '0', speed: '0' },
+    ];
+    let filtered = [...allData];
+
+    function renderTable() {
+      document.getElementById('rcount').textContent = filtered.length + ' PROBES';
+      document.getElementById('sc-total').textContent = allData.length;
+      document.getElementById('sc-agencies').textContent = new Set(allData.map(x => x.ag)).size;
+
+      let maxS = 0; let farthest = '0';
+      allData.forEach(d => {
+        let s = parseFloat(d.speed); if (!isNaN(s) && s > maxS) maxS = s;
+        if (d.dist.includes('B')) farthest = d.dist;
+      });
+      document.getElementById('sc-speed').textContent = maxS;
+      document.getElementById('sc-dist').textContent = farthest || '—';
+
+      const tb = document.getElementById('tableBody');
+      tb.innerHTML = filtered.map(d => `
+    <tr>
+      <td class="td-name">${d.name}</td>
+      <td class="td-orange">${d.ag}</td>
+      <td style="color:var(--text-dim)">${d.type}</td>
+      <td class="td-purple">${d.reg}</td>
+      <td class="td-hl">${d.yr}</td>
+      <td>${d.dist}</td>
+      <td class="td-green">${d.speed}</td>
+    </tr>
+  `).join('');
+
+      if (allData.length > 0) {
+        document.getElementById('feedList').innerHTML = allData.slice(0, 8).map(d => `
+      <div class="probe-card">
+        <div class="p-name">${d.name}</div>
+        <div class="p-meta"><span>${d.reg}</span><span style="color:var(--cyan)">${d.dist} KM</span></div>
+        <div class="p-meta"><span>${d.yr}</span><span style="color:var(--green)">${d.speed} km/s</span></div>
+      </div>
+    `).join('');
+      } else {
+        document.getElementById('feedList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:9px;">NO DATA AVAILABLE</div>';
+      }
+
+      document.getElementById('tableLoading').style.display = 'none';
+      document.getElementById('dataTable').style.display = 'table';
+    }
+
+    function filterBy(kw) {
+      document.querySelectorAll('.nxs-filters .nxs-fbtn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const sq = document.getElementById('searchQ').value.toLowerCase();
+      filtered = allData.filter(d => {
+        if (kw !== 'all' && !d.ag.includes(kw)) return false;
+        if (sq && !d.name.toLowerCase().includes(sq)) return false;
+        return true;
+      });
+      renderTable();
+    }
+
+    function applyFilters() {
+      const activeBtn = document.querySelector('.nxs-filters .active');
+      filterBy(activeBtn ? (activeBtn.textContent === 'ALL PROBES' ? 'all' : activeBtn.textContent) : 'all');
+    }
+
+    setTimeout(() => { renderTable(); }, 150);
+  </script>
+</body>
+
+</html>

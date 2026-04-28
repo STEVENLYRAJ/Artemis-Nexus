@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArtemisNexus — Solar System</title>
+<link rel="stylesheet" href="ArtemisNexus-style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ArtemisAPI.js"></script>
+<style>
+.layout{display:grid;grid-template-columns:250px 1fr;height:calc(100vh - 70px);position:relative;z-index:5;}
+.left-col{background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.center-col{display:flex;flex-direction:column;overflow:hidden;}
+.controls-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.table-wrap{flex:1;overflow-y:auto;}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5;}
+
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(2,8,20,.95);}
+.stats-strip .nxs-stat-big{border-right:1px solid var(--border);padding:12px 6px;}
+
+.body-card{padding:14px;border-bottom:1px solid rgba(0,229,255,0.08);transition:all .2s;cursor:pointer;}
+.body-card:hover{background:rgba(0,229,255,0.05);}
+.body-name{font-family:var(--font-display);font-size:13px;color:var(--cyan);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}
+.body-meta{font-family:var(--font-mono);font-size:9px;color:var(--text-dim);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<header class="nxs-header">
+  <div class="nxs-logo"><div class="nxs-logo-icon"></div>
+    <div><div class="nxs-logo-text">ArtemisNexus</div><div class="nxs-logo-sub">SOLAR SYSTEM BODIES</div></div>
+  </div>
+  <div id="navMount"></div>
+  <div class="nxs-hdr-right">
+    <div class="nxs-stat">API SOURCE<span id="apiSource">LE SYSTEME SOLAIRE</span></div>
+    <div class="nxs-live"><div class="nxs-live-dot"></div>SYNCED</div>
+  </div>
+</header>
+<div class="nxs-ticker"><div class="nxs-ticker-inner" id="ticker"></div></div>
+
+<div class="layout">
+  <!-- LEFT PANEL -->
+  <div class="left-col">
+    <div class="nxs-panel-hdr">● MAJOR PLANET PROFILES</div>
+    <div id="feedList" class="nxs-loading"><div class="nxs-spinner"></div></div>
+  </div>
+
+  <!-- CENTER PANEL -->
+  <div class="center-col">
+    <div class="stats-strip">
+      <div class="nxs-stat-big"><div class="val sv-cyan" id="sc-total">—</div><div class="lbl">TOTAL BODIES</div></div>
+      <div class="nxs-stat-big"><div class="val sv-green" id="sc-moons">—</div><div class="lbl">TOTAL MOONS</div></div>
+      <div class="nxs-stat-big"><div class="val sv-orange" id="sc-types">—</div><div class="lbl">BODY TYPES</div></div>
+      <div class="nxs-stat-big"><div class="val sv-purple" id="sc-gravity">—</div><div class="lbl">AVG GRAVITY</div></div>
+    </div>
+    
+    <div class="controls-bar">
+      <div class="nxs-filters">
+        <button class="nxs-fbtn active" onclick="filterBy('all')">ALL BODIES</button>
+        <button class="nxs-fbtn" onclick="filterBy('Planet')">PLANETS</button>
+        <button class="nxs-fbtn" onclick="filterBy('Dwarf Planet')">DWARF PLANETS</button>
+      </div>
+      <input class="nxs-search" id="searchQ" placeholder="SEARCH BODY..." style="width:200px;" oninput="applyFilters()">
+    </div>
+
+    <div class="table-wrap">
+      <div class="tbl-top">
+        <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--cyan);opacity:.8;">● ORBITAL DATABASE</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rcount">0 records</span>
+      </div>
+      <div id="tableLoading" class="nxs-loading"><div class="nxs-spinner"></div><div class="nxs-loading-text">FETCHING DATA...</div></div>
+      <table class="nxs-table" id="dataTable" style="display:none;">
+        <thead><tr><th>BODY NAME</th><th>TYPE</th><th>DIAMETER (KM)</th><th>PERIHELION (KM)</th><th>ORBIT (DAYS)</th><th>MOONS</th><th>GRAVITY</th></tr></thead>
+        <tbody id="tableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('solarsystembodies');
+const t = '▶ JUNO: Closer examination of Io reveals massive lava lakes&nbsp;&nbsp;●&nbsp;&nbsp;▶ PERSEVERANCE: Martian dust season tracking nominal&nbsp;&nbsp;●&nbsp;&nbsp;▶ SOLAR: CME detected en route to outer planets';
+document.getElementById('ticker').innerHTML = `<span>${t}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${t}</span>`;
+
+let allData = [
+  {name:'Mercury', type:'Planet', diam:'4879', dist:'46001200', orbit:'87.97', moons:'0', grav:'3.7'},
+  {name:'Venus', type:'Planet', diam:'12104', dist:'107477000', orbit:'224.70', moons:'0', grav:'8.87'},
+  {name:'Earth', type:'Planet', diam:'12742', dist:'147095000', orbit:'365.25', moons:'1', grav:'9.80'},
+  {name:'Mars', type:'Planet', diam:'6779', dist:'206620000', orbit:'686.97', moons:'2', grav:'3.72'},
+  {name:'Jupiter', type:'Planet', diam:'139820', dist:'740522000', orbit:'4332.59', moons:'95', grav:'24.79'},
+  {name:'Saturn', type:'Planet', diam:'116460', dist:'1352550000', orbit:'10759.22', moons:'146', grav:'10.44'},
+  {name:'Uranus', type:'Planet', diam:'50724', dist:'2748938000', orbit:'30589.00', moons:'28', grav:'8.87'},
+  {name:'Neptune', type:'Planet', diam:'49244', dist:'4444449000', orbit:'59799.90', moons:'16', grav:'11.15'},
+  {name:'Pluto', type:'Dwarf Planet', diam:'2377', dist:'4436820000', orbit:'90560.00', moons:'5', grav:'0.62'},
+  {name:'Eris', type:'Dwarf Planet', diam:'2326', dist:'5766000000', orbit:'203830.00', moons:'1', grav:'0.82'},
+  {name:'Ceres', type:'Dwarf Planet', diam:'939', dist:'381497000', orbit:'1680.15', moons:'0', grav:'0.27'},
+  {name:'Makemake', type:'Dwarf Planet', diam:'1430', dist:'5782000000', orbit:'112042.00', moons:'1', grav:'0.57'},
+  {name:'Haumea', type:'Dwarf Planet', diam:'1632', dist:'5157000000', orbit:'103774.00', moons:'2', grav:'0.63'},
+];
+let filtered = [...allData];
+
+function renderTable() {
+  document.getElementById('rcount').textContent = filtered.length + ' BODIES';
+  document.getElementById('sc-total').textContent = allData.length;
+  
+  let mCount = 0;
+  let gSum = 0;
+  let c = 0;
+  
+  allData.forEach(x => { 
+    mCount += parseInt(x.moons)||0; 
+    let g = parseFloat(x.grav);
+    if(!isNaN(g)){ gSum += g; c++; }
+  });
+  
+  document.getElementById('sc-moons').textContent = mCount;
+  document.getElementById('sc-types').textContent = new Set(allData.map(x=>x.type)).size;
+  document.getElementById('sc-gravity').textContent = c ? (gSum/c).toFixed(1) : '—';
+
+  const tb = document.getElementById('tableBody');
+  tb.innerHTML = filtered.map(d => `
+    <tr>
+      <td class="td-name">${d.name}</td>
+      <td class="td-hl">${d.type}</td>
+      <td class="td-purple">${d.diam}</td>
+      <td style="color:var(--text-dim)">${d.dist}</td>
+      <td class="td-orange">${d.orbit}</td>
+      <td>${d.moons}</td>
+      <td class="td-green">${d.grav.includes('m/s') ? d.grav : d.grav + ' m/s²'}</td>
+    </tr>
+  `).join('');
+  
+  if (allData.length > 0) {
+    document.getElementById('feedList').innerHTML = allData.slice(0,8).map(d => `
+      <div class="body-card">
+        <div class="body-name">${d.name}</div>
+        <div class="body-meta"><span>${d.type}</span><span style="color:var(--cyan)">O: ${d.orbit}d</span></div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('feedList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:9px;">NO DATA AVAILABLE</div>';
+  }
+
+  document.getElementById('tableLoading').style.display = 'none';
+  document.getElementById('dataTable').style.display = 'table';
+}
+
+function filterBy(kw) {
+  document.querySelectorAll('.nxs-filters .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  const sq = document.getElementById('searchQ').value.toLowerCase();
+  filtered = allData.filter(d => {
+    if(kw !== 'all' && !d.type.includes(kw)) return false;
+    if(sq && !d.name.toLowerCase().includes(sq)) return false;
+    return true;
+  });
+  renderTable();
+}
+
+function applyFilters() {
+  const activeBtn = document.querySelector('.nxs-filters .active');
+  const kw = activeBtn ? (activeBtn.textContent.includes('ALL') ? 'all' : (activeBtn.textContent.includes('DWARF') ? 'Dwarf Planet' : 'Planet')) : 'all';
+  filterBy(kw);
+}
+
+setTimeout(()=>{ renderTable(); }, 150);
+</script>
+</body>
+</html>

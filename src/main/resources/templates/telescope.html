@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artemis — Telescopes</title>
+<link rel="stylesheet" href="ArtemisNexus-style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ArtemisAPI.js"></script>
+<style>
+.layout{display:grid;grid-template-columns:1fr 320px;height:calc(100vh - 70px);position:relative;z-index:5;}
+.left-col{display:flex;flex-direction:column;overflow:hidden;}
+.right-col{background:var(--bg-panel);border-left:1px solid var(--border);overflow-y:auto;}
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--border);flex-shrink:0;}
+.stats-row .nxs-stat-big{border-right:1px solid var(--border);}
+.stats-row .nxs-stat-big:last-child{border-right:none;}
+.controls-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.table-wrap{flex:1;overflow-y:auto;}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5;}
+.det-panel{padding:14px;border-bottom:1px solid var(--border);}
+.det-name{font-family:var(--font-display);font-size:11px;font-weight:700;color:var(--purple);letter-spacing:2px;margin-bottom:2px;text-shadow:0 0 10px rgba(176,96,255,.5);}
+.det-sub{font-family:var(--font-mono);font-size:8px;color:var(--text-dim);letter-spacing:2px;margin-bottom:10px;}
+.chart-box{padding:12px;border-bottom:1px solid var(--border);}
+.chart-box-title{font-family:var(--font-display);font-size:7px;letter-spacing:2px;color:var(--purple);margin-bottom:8px;opacity:.8;}
+.chart-box .nxs-chart-wrap{height:120px;}
+.obs-target{padding:8px 10px;border-left:2px solid var(--purple);background:rgba(176,96,255,.06);margin-bottom:6px;}
+.obs-title{font-family:var(--font-mono);font-size:9px;color:var(--text-primary);margin-bottom:2px;}
+.obs-meta{font-family:var(--font-mono);font-size:8px;color:var(--text-dim);}
+</style>
+</head>
+<body>
+<header class="nxs-header" style="--border-bright:rgba(176,96,255,.4);border-bottom-color:rgba(176,96,255,.4);">
+  <div class="nxs-logo">
+    <div class="nxs-logo-icon" style="border-color:var(--purple);box-shadow:0 0 15px rgba(176,96,255,.4),inset 0 0 15px rgba(176,96,255,.12);"></div>
+    <div><div class="nxs-logo-text" style="color:var(--purple);text-shadow:0 0 20px rgba(176,96,255,.4);">ArtemisNexus</div><div class="nxs-logo-sub">TELESCOPE OBSERVATORY NETWORK</div></div>
+  </div>
+  <div id="navMount"></div>
+  <div class="nxs-hdr-right">
+    <div class="nxs-stat">JWST STATUS<span style="color:var(--green);">ACTIVE</span></div>
+    <div class="nxs-live" style="color:var(--purple);"><div class="nxs-live-dot" style="background:var(--purple);box-shadow:0 0 8px var(--purple);"></div>OBS LIVE</div>
+  </div>
+</header>
+<div class="nxs-ticker"><div class="nxs-ticker-inner" id="ticker"></div></div>
+
+<div class="layout">
+  <div class="left-col">
+    <div class="stats-row">
+      <div class="nxs-stat-big"><div class="val sv-purple" id="st-total">—</div><div class="lbl">TELESCOPES</div></div>
+      <div class="nxs-stat-big"><div class="val sv-green" id="st-active">—</div><div class="lbl">ACTIVE</div></div>
+      <div class="nxs-stat-big"><div class="val sv-cyan" id="st-space">—</div><div class="lbl">SPACE-BASED</div></div>
+      <div class="nxs-stat-big"><div class="val sv-orange" id="st-ground">—</div><div class="lbl">GROUND-BASED</div></div>
+      <div class="nxs-stat-big"><div class="val sv-yellow" id="st-planned">—</div><div class="lbl">PLANNED</div></div>
+    </div>
+    <div class="controls-bar">
+      <div class="nxs-filters" id="fBtns">
+        <button class="nxs-fbtn active" onclick="filterTel('all',this)">ALL</button>
+        <button class="nxs-fbtn" onclick="filterTel('space',this)">SPACE</button>
+        <button class="nxs-fbtn" onclick="filterTel('ground',this)">GROUND</button>
+        <button class="nxs-fbtn" onclick="filterTel('radio',this)">RADIO</button>
+        <button class="nxs-fbtn" onclick="filterTel('xray',this)">X-RAY/GAMMA</button>
+        <button class="nxs-fbtn" onclick="filterTel('planned',this)">UPCOMING</button>
+      </div>
+      <input class="nxs-search" id="searchQ" placeholder="SEARCH…" style="width:150px;" oninput="renderTable()">
+    </div>
+    <div class="table-wrap">
+      <div class="tbl-top">
+        <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--purple);opacity:.8;">● TELESCOPE REGISTRY</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rowCount">—</span>
+      </div>
+      <table class="nxs-table" id="telTable">
+        <thead><tr><th>NAME</th><th>TYPE</th><th>LOCATION</th><th>APERTURE</th><th>WAVELENGTH</th><th>AGENCY</th><th>STATUS</th><th>SINCE</th></tr></thead>
+        <tbody id="telTbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="right-col">
+    <div class="det-panel">
+      <div class="det-name" id="detName">SELECT TELESCOPE</div>
+      <div class="det-sub" id="detSub">—</div>
+      <div id="detRows"></div>
+    </div>
+    <div style="padding:14px;border-bottom:1px solid var(--border);">
+      <div class="nxs-panel-hdr" style="border:none;padding:0 0 8px;color:var(--purple);">● CURRENT OBSERVATION TARGETS</div>
+      <div id="obsList"></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-box-title">▸ APERTURE SIZE (meters)</div>
+      <div class="nxs-chart-wrap"><canvas id="apChart"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-box-title">▸ TELESCOPES BY WAVEBAND</div>
+      <div class="nxs-chart-wrap"><canvas id="waveChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('telescope');
+const t = '▶ JWST: Currently observing NGC 4889 galaxy cluster&nbsp;&nbsp;●&nbsp;&nbsp;▶ Extremely Large Telescope (ELT): First light expected 2028&nbsp;&nbsp;●&nbsp;&nbsp;▶ SKA: Square Kilometre Array — world\'s largest radio telescope under construction&nbsp;&nbsp;●&nbsp;&nbsp;▶ Chandra X-Ray: 25 years observing black holes and neutron stars';
+document.getElementById('ticker').innerHTML = `<span>${t}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${t}</span>`;
+
+const TELESCOPES = [
+  {name:'James Webb ST',type:'Space',cat:'space',location:'L2 Point',aperture:6.5,wave:'Infrared',agency:'NASA/ESA/CSA',status:'Active',since:2021,key:'JWST',note:'Successor to Hubble — deepest IR images',target:'NGC 4889 galaxy cluster'},
+  {name:'Hubble ST',type:'Space',cat:'space',location:'LEO 540km',aperture:2.4,wave:'UV/Optical/Near-IR',agency:'NASA/ESA',status:'Active',since:1990,key:'HST',note:'35+ years — over 1.5M observations',target:'Crab Nebula supernova remnant'},
+  {name:'Chandra X-Ray',type:'Space',cat:'xray',location:'High-EO 139,000km',aperture:1.2,wave:'X-Ray',agency:'NASA',status:'Active',since:1999,key:'CXO',note:'Black holes, neutron stars, galaxy clusters',target:'Sagittarius A* galactic center'},
+  {name:'XMM-Newton',type:'Space',cat:'xray',location:'High Orbit',aperture:0.7,wave:'X-Ray',agency:'ESA',status:'Active',since:1999,key:'XMM',note:'European X-Ray observatory',target:'Galaxy cluster Abell 2029'},
+  {name:'Fermi Gamma-Ray',type:'Space',cat:'xray',location:'LEO 550km',aperture:null,wave:'Gamma-Ray',agency:'NASA',status:'Active',since:2008,key:'FERMI',note:'Gamma-ray bursts, pulsars, dark matter',target:'All-sky survey mode'},
+  {name:'Spitzer ST',type:'Space',cat:'space',location:'Earth-trailing orbit',aperture:0.85,wave:'Infrared',agency:'NASA',status:'Offline',since:2003,key:'SST',note:'Decommissioned Jan 2020',target:'—'},
+  {name:'Very Large Telescope',type:'Ground',cat:'ground',location:'Atacama, Chile',aperture:8.2,wave:'Optical/NIR',agency:'ESA',status:'Active',since:1998,key:'VLT',note:'Four 8.2m telescopes, interferometry',target:'Protoplanetary disk imaging'},
+  {name:'W.M. Keck Observatory',type:'Ground',cat:'ground',location:'Mauna Kea, HI',aperture:10.0,wave:'Optical/NIR',agency:'Caltech/UC',status:'Active',since:1993,key:'KECK',note:'Largest optical telescopes in US',target:'Exoplanet atmospheres'},
+  {name:'Atacama Large MM Array',type:'Ground',cat:'radio',location:'Atacama, Chile',aperture:16.0,wave:'Millimetre/Sub-mm',agency:'ESO/NAOJ/NRAO',status:'Active',since:2013,key:'ALMA',note:'66 antennas, highest resolution',target:'Protostellar disk HL Tau'},
+  {name:'Event Horizon Telescope',type:'Ground Array',cat:'radio',location:'Global Array',aperture:10000.0,wave:'Radio (mm)',agency:'Multi-agency',status:'Active',since:2017,key:'EHT',note:'Imaged first black hole M87* 2019',target:'Sagittarius A* monitoring'},
+  {name:'Arecibo (decommissioned)',type:'Ground',cat:'radio',location:'Puerto Rico',aperture:305.0,wave:'Radio',agency:'NSF',status:'Offline',since:1963,key:'AO',note:'Collapsed 2020 — largest radio dish',target:'—'},
+  {name:'Green Bank Telescope',type:'Ground',cat:'radio',location:'West Virginia, USA',aperture:100.0,wave:'Radio',agency:'GBO',status:'Active',since:2000,key:'GBT',note:"World's largest fully steerable dish",target:'FRB (Fast Radio Bursts)'},
+  {name:'Thirty Meter Telescope',type:'Ground',cat:'ground',location:'Mauna Kea (planned)',aperture:30.0,wave:'Optical/NIR',agency:'TMT Int.',status:'Planned',since:null,key:'TMT',note:'Construction delayed pending approvals',target:'—'},
+  {name:'Extremely Large Telescope',type:'Ground',cat:'ground',location:'Cerro Armazones, Chile',aperture:39.3,wave:'Optical/NIR',agency:'ESO',status:'Planned',since:2028,key:'ELT',note:'Largest optical telescope ever built',target:'—'},
+  {name:'Square Kilometre Array',type:'Ground Array',cat:'radio',location:'S.Africa/Australia',aperture:1000.0,wave:'Radio',agency:'SKA Org.',status:'Construction',since:2027,key:'SKA',note:'World\'s largest radio telescope array',target:'—'},
+  {name:'Nancy Grace Roman ST',type:'Space',cat:'space',location:'L2 Point',aperture:2.4,wave:'Near-IR',agency:'NASA',status:'Planned',since:2027,key:'RST',note:'Wide-field survey, dark energy mission',target:'—'},
+  {name:'LISA',type:'Space',cat:'space',location:'Solar orbit',aperture:null,wave:'Gravitational Wave',agency:'ESA',status:'Planned',since:2035,key:'LISA',note:'First space-based gravitational wave detector',target:'—'},
+];
+
+const OBS_TARGETS = [
+  {scope:'JWST',target:'NGC 4889 Galaxy Cluster',type:'Deep Field',since:'2026-04-10'},
+  {scope:'Hubble',target:'Crab Nebula M1 Supernova Remnant',type:'Nebula',since:'2026-04-14'},
+  {scope:'Chandra',target:'Sagittarius A* Flare Activity',type:'Black Hole',since:'2026-04-18'},
+  {scope:'ALMA',target:'HL Tau Protoplanetary Disk',type:'Star Formation',since:'2026-04-12'},
+  {scope:'EHT',target:'M87* Black Hole Follow-up',type:'Black Hole',since:'2026-04-01'},
+  {scope:'VLT',target:'HR 8799 Exoplanet Direct Imaging',type:'Exoplanets',since:'2026-04-16'},
+];
+
+let filtered = [...TELESCOPES], selIdx = -1;
+
+function filterTel(f, btn) {
+  document.querySelectorAll('#fBtns .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  filtered = f === 'all' ? [...TELESCOPES] : TELESCOPES.filter(t => t.cat === f || (f==='planned'&&(t.status==='Planned'||t.status==='Construction')));
+  renderTable();
+}
+
+function renderTable() {
+  const q = document.getElementById('searchQ').value.toLowerCase();
+  const rows = q ? filtered.filter(t => t.name.toLowerCase().includes(q)) : filtered;
+  document.getElementById('rowCount').textContent = `${rows.length} TELESCOPES`;
+  document.getElementById('st-total').textContent = TELESCOPES.length;
+  document.getElementById('st-active').textContent = TELESCOPES.filter(t=>t.status==='Active').length;
+  document.getElementById('st-space').textContent = TELESCOPES.filter(t=>t.cat==='space').length;
+  document.getElementById('st-ground').textContent = TELESCOPES.filter(t=>t.cat==='ground'||t.cat==='radio').length;
+  document.getElementById('st-planned').textContent = TELESCOPES.filter(t=>t.status==='Planned'||t.status==='Construction').length;
+
+  document.getElementById('telTbody').innerHTML = rows.map(tel => {
+    const idx = TELESCOPES.indexOf(tel);
+    const sc = tel.status==='Active'?'badge-active':tel.status==='Planned'?'badge-planned':tel.status==='Construction'?'badge-warning':'badge-offline';
+    return `<tr onclick="selectTel(${idx})" class="${selIdx===idx?'selected':''}">
+      <td class="td-name">${tel.name}</td>
+      <td style="color:var(--text-secondary);font-size:8px;">${tel.type}</td>
+      <td style="color:var(--text-dim);font-size:8px;">${tel.location}</td>
+      <td class="td-purple">${tel.aperture ? tel.aperture+'m' : '—'}</td>
+      <td style="color:var(--cyan);font-size:8px;">${tel.wave}</td>
+      <td class="td-orange" style="font-size:8px;">${tel.agency}</td>
+      <td><span class="nxs-badge ${sc}">${tel.status}</span></td>
+      <td class="td-hl">${tel.since||'TBD'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function selectTel(i) {
+  selIdx = i; const tel = TELESCOPES[i];
+  document.getElementById('detName').textContent = tel.name.toUpperCase();
+  document.getElementById('detSub').textContent = tel.type + ' · ' + tel.agency;
+  document.getElementById('detRows').innerHTML = [
+    ['TYPE', tel.type], ['LOCATION', tel.location],
+    ['APERTURE', tel.aperture ? tel.aperture+'m' : 'N/A'],
+    ['WAVELENGTH', tel.wave], ['AGENCY', tel.agency],
+    ['STATUS', tel.status], ['SINCE', tel.since||'TBD'],
+    ['NOTE', tel.note],
+    tel.target ? ['CURRENT TARGET', tel.target] : null
+  ].filter(Boolean).map(([l,v]) =>
+    `<div class="nxs-drow"><span class="nxs-drow-lbl">${l}</span><span class="nxs-drow-val">${v}</span></div>`
+  ).join('');
+  renderTable();
+  // Show obs targets for selected
+  const targets = OBS_TARGETS.filter(o => o.scope === tel.key);
+  document.getElementById('obsList').innerHTML = (targets.length ? targets : OBS_TARGETS.slice(0,3)).map(o => `
+    <div class="obs-target">
+      <div class="obs-title">${o.target}</div>
+      <div class="obs-meta">${o.scope} · ${o.type} · Since ${o.since}</div>
+    </div>`).join('') || '<div style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);">NO ACTIVE OBSERVATIONS</div>';
+}
+
+// Init obs list
+document.getElementById('obsList').innerHTML = OBS_TARGETS.map(o => `
+  <div class="obs-target"><div class="obs-title">${o.target}</div><div class="obs-meta">${o.scope} · ${o.type} · Since ${o.since}</div></div>`).join('');
+
+// Charts
+const spaceScopes = TELESCOPES.filter(t => t.aperture && t.status==='Active').sort((a,b)=>b.aperture-a.aperture).slice(0,8);
+new Chart(document.getElementById('apChart'), {
+  type:'bar', data:{ labels:spaceScopes.map(t=>t.key), datasets:[{ data:spaceScopes.map(t=>t.aperture), backgroundColor:spaceScopes.map(t=>t.cat==='space'?'rgba(176,96,255,.6)':t.cat==='radio'?'rgba(0,229,255,.5)':'rgba(0,255,136,.5)'), borderColor:spaceScopes.map(t=>t.cat==='space'?'#b060ff':t.cat==='radio'?'#00e5ff':'#00ff88'), borderWidth:1 }] },
+  options:{ ...ArtemisNexus.chartDefaults('#b060ff'), plugins:{ legend:{ display:false } }, scales:{ ...ArtemisNexus.chartDefaults('#b060ff').scales, y:{ ...ArtemisNexus.chartDefaults().scales.y, type:'logarithmic' } } }
+});
+const waveCounts = {}; TELESCOPES.filter(t=>t.status==='Active').forEach(t=>{ const w=t.wave.split('/')[0]; waveCounts[w]=(waveCounts[w]||0)+1; });
+new Chart(document.getElementById('waveChart'), {
+  type:'doughnut', data:{ labels:Object.keys(waveCounts), datasets:[{ data:Object.values(waveCounts), backgroundColor:['rgba(176,96,255,.7)','rgba(0,229,255,.6)','rgba(0,255,136,.6)','rgba(255,192,64,.6)','rgba(255,107,43,.6)','rgba(255,48,96,.6)'], borderWidth:1 }] },
+  options:{ ...ArtemisNexus.chartDefaults('#b060ff'), cutout:'55%' }
+});
+
+renderTable();
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArtemisNexus — Upcoming Launches</title>
+<link rel="stylesheet" href="ArtemisNexus-style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ArtemisAPI.js"></script>
+<style>
+.layout{display:grid;grid-template-columns:250px 1fr;height:calc(100vh - 70px);position:relative;z-index:5;}
+.left-col{background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.center-col{display:flex;flex-direction:column;overflow:hidden;}
+.controls-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.table-wrap{flex:1;overflow-y:auto;}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5;}
+
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(2,8,20,.95);}
+.stats-strip .nxs-stat-big{border-right:1px solid var(--border);padding:12px 6px;}
+
+.launch-card{padding:14px;border-bottom:1px solid rgba(0,229,255,0.08);transition:all .2s;cursor:pointer;}
+.launch-card:hover{background:rgba(0,229,255,0.05);}
+.l-name{font-family:var(--font-display);font-size:12px;color:var(--cyan);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}
+.l-meta{font-family:var(--font-mono);font-size:9px;color:var(--text-dim);display:flex;justify-content:space-between; margin-bottom: 6px;}
+</style>
+</head>
+<body>
+<header class="nxs-header">
+  <div class="nxs-logo"><div class="nxs-logo-icon"></div>
+    <div><div class="nxs-logo-text">ArtemisNexus</div><div class="nxs-logo-sub">GLOBAL LAUNCH MANIFEST</div></div>
+  </div>
+  <div id="navMount"></div>
+  <div class="nxs-hdr-right">
+    <div class="nxs-stat">API SOURCE<span id="apiSource">SPACEDEVS LL2</span></div>
+    <div class="nxs-live"><div class="nxs-live-dot"></div>SYNCED</div>
+  </div>
+</header>
+<div class="nxs-ticker"><div class="nxs-ticker-inner" id="ticker"></div></div>
+
+<div class="layout">
+  <!-- LEFT PANEL -->
+  <div class="left-col">
+    <div class="nxs-panel-hdr">● T-MINUS MANIFEST</div>
+    <div id="feedList" class="nxs-loading"><div class="nxs-spinner"></div></div>
+  </div>
+
+  <!-- CENTER PANEL -->
+  <div class="center-col">
+    <div class="stats-strip">
+      <div class="nxs-stat-big"><div class="val sv-cyan" id="sc-total">—</div><div class="lbl">MANIFESTED FLIGHTS</div></div>
+      <div class="nxs-stat-big"><div class="val sv-orange" id="sc-agencies">—</div><div class="lbl">ACTIVE PROVIDERS</div></div>
+      <div class="nxs-stat-big"><div class="val sv-green" id="sc-types">—</div><div class="lbl">MISSIONS TO LEO</div></div>
+      <div class="nxs-stat-big"><div class="val sv-purple" id="sc-tbd">—</div><div class="lbl">TBD MISSIONS</div></div>
+    </div>
+    
+    <div class="controls-bar">
+      <div class="nxs-filters">
+        <button class="nxs-fbtn active" onclick="filterBy('all')">ALL LAUNCHES</button>
+        <button class="nxs-fbtn" onclick="filterBy('SpaceX')">SPACEX</button>
+        <button class="nxs-fbtn" onclick="filterBy('NASA')">NASA</button>
+        <button class="nxs-fbtn" onclick="filterBy('ISRO')">ISRO</button>
+      </div>
+      <input class="nxs-search" id="searchQ" placeholder="SEARCH FLIGHT..." style="width:200px;" oninput="applyFilters()">
+    </div>
+
+    <div class="table-wrap">
+      <div class="tbl-top">
+        <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--cyan);opacity:.8;">● LAUNCH LIBRARY DB</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rcount">0 records</span>
+      </div>
+      <div id="tableLoading" class="nxs-loading"><div class="nxs-spinner"></div><div class="nxs-loading-text">FETCHING DATA...</div></div>
+      <table class="nxs-table" id="dataTable" style="display:none;">
+        <thead><tr><th>MISSION/ROCKET</th><th>PROVIDER</th><th>TYPE</th><th>DESTINATION</th><th>NET (DATE)</th><th>STATUS</th></tr></thead>
+        <tbody id="tableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('upcomingmissions');
+const t = '▶ SPACEX: IFT-8 stacking in progress&nbsp;&nbsp;●&nbsp;&nbsp;▶ ISRO: Gaganyaan test vehicle rolling out&nbsp;&nbsp;●&nbsp;&nbsp;▶ NASA: Gateway components arriving at KSC';
+document.getElementById('ticker').innerHTML = `<span>${t}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${t}</span>`;
+
+// Rich mission launch dataset — loaded directly via JS
+let allData = [
+  {name:'Starship IFT-8', prv:'SpaceX', type:'Integrated Flight Test', dest:'Sub-Orbital', yr:'2026-05-15', stat:'Go'},
+  {name:'Falcon 9 | Starlink 12-14', prv:'SpaceX', type:'Satellite Deployment', dest:'LEO', yr:'2026-04-28', stat:'Go'},
+  {name:'Artemis III', prv:'NASA', type:'Crewed Lunar', dest:'Moon', yr:'2026-09-01', stat:'TBD'},
+  {name:'GSLV Mk III | OneWeb', prv:'ISRO', type:'Satellite Deployment', dest:'LEO', yr:'2026-05-02', stat:'Go'},
+  {name:'Ariane 6 | Eutelsat 36D', prv:'ArianeSpace', type:'Commercial GEO', dest:'GTO', yr:'2026-06-10', stat:'Go'},
+  {name:'New Glenn | Demo-2', prv:'Blue Origin', type:'Demo Flight', dest:'GTO', yr:'2026-07-20', stat:'TBD'},
+  {name:'Long March 5B | CSS Module', prv:'CASC', type:'Space Station', dest:'LEO', yr:'2026-08-05', stat:'Go'},
+  {name:'Falcon Heavy | Europa Relay', prv:'SpaceX', type:'Deep Space', dest:'Heliocentric', yr:'2026-10-12', stat:'TBD'},
+  {name:'Artemis IV', prv:'NASA', type:'Crewed Lunar', dest:'Moon', yr:'2027-06-01', stat:'TBD'},
+  {name:'Gaganyaan TV-D2', prv:'ISRO', type:'Crewed Mission Test', dest:'LEO', yr:'2026-12-01', stat:'TBD'},
+  {name:'Tianwen-2', prv:'CNSA', type:'Asteroid Sample Return', dest:'Kamo\'oalewa', yr:'2025-05-29', stat:'Go'},
+  {name:'Lunar Gateway PPE', prv:'SpaceX/NASA', type:'Space Station', dest:'Lunar Orbit', yr:'2027-11-01', stat:'TBD'},
+];
+let filtered = [...allData];
+
+function renderTable() {
+  document.getElementById('rcount').textContent = filtered.length + ' LAUNCHES';
+  document.getElementById('sc-total').textContent = allData.length;
+  document.getElementById('sc-agencies').textContent = new Set(allData.map(x=>x.prv)).size;
+  document.getElementById('sc-types').textContent = allData.filter(x=>x.dest.includes('LEO')).length;
+  document.getElementById('sc-tbd').textContent = allData.filter(x=>x.stat.includes('TBD')).length;
+
+  const tb = document.getElementById('tableBody');
+  tb.innerHTML = filtered.map(d => `
+    <tr>
+      <td class="td-name">${d.name}</td>
+      <td class="td-orange">${d.prv}</td>
+      <td style="color:var(--text-dim)">${d.type}</td>
+      <td class="td-purple">${d.dest}</td>
+      <td class="td-hl">${d.yr}</td>
+      <td><span class="nxs-status ${d.stat.includes('Go') ? 'st-active' : 'st-standby'}">${d.stat.toUpperCase()}</span></td>
+    </tr>
+  `).join('');
+  
+  if (allData.length > 0) {
+    document.getElementById('feedList').innerHTML = allData.slice(0,8).map(d => `
+      <div class="launch-card">
+        <div class="l-name">${d.name}</div>
+        <div class="l-meta"><span>${d.prv}</span><span>${d.yr}</span></div>
+        <div style="font-size:12px; font-weight:bold; color:${d.stat.includes('Go')?'var(--green)':'var(--yellow)'}; font-family:var(--font-mono)">${d.stat.toUpperCase()}</div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('feedList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:9px;">NO DATA AVAILABLE</div>';
+  }
+
+  document.getElementById('tableLoading').style.display = 'none';
+  document.getElementById('dataTable').style.display = 'table';
+}
+
+function filterBy(kw) {
+  document.querySelectorAll('.nxs-filters .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  const sq = document.getElementById('searchQ').value.toLowerCase();
+  filtered = allData.filter(d => {
+    if(kw !== 'all' && !d.prv.includes(kw)) return false;
+    if(sq && !d.name.toLowerCase().includes(sq)) return false;
+    return true;
+  });
+  renderTable();
+}
+
+function applyFilters() {
+  const activeBtn = document.querySelector('.nxs-filters .active');
+  filterBy(activeBtn ? (activeBtn.textContent==='ALL LAUNCHES'?'all':activeBtn.textContent) : 'all');
+}
+
+setTimeout(()=>{ renderTable(); }, 150);
+</script>
+</body>
+</html>

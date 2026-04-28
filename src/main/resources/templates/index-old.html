@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS — Space Mission Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #020810;
+      --bg-panel: rgba(4, 18, 35, 0.92);
+      --bg-card: rgba(6, 24, 46, 0.85);
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0, 229, 255, 0.15);
+      --cyan-glow: rgba(0, 229, 255, 0.4);
+      --orange: #ff6b2b;
+      --orange-dim: rgba(255, 107, 43, 0.15);
+      --green: #00ff88;
+      --green-dim: rgba(0, 255, 136, 0.15);
+      --red: #ff2b55;
+      --text-primary: #e8f4ff;
+      --text-secondary: #7eb8d4;
+      --text-dim: #3a6b87;
+      --border: rgba(0, 229, 255, 0.18);
+      --border-bright: rgba(0, 229, 255, 0.5);
+      --font-display: 'Orbitron', monospace;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-body: 'Exo 2', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* Starfield background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 25% 42%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 40% 8%, rgba(0,229,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 55% 75%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 30%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 82% 60%, rgba(0,229,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 20%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 48% 55%, rgba(255,255,255,0.2) 0%, transparent 100%),
+        radial-gradient(1px 1px at 63% 90%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 35% 68%, rgba(0,229,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 77% 45%, rgba(255,255,255,0.25) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Scanline effect */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 229, 255, 0.015) 2px,
+        rgba(0, 229, 255, 0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+      animation: scanlines 8s linear infinite;
+    }
+
+    @keyframes scanlines {
+      0% { background-position: 0 0; }
+      100% { background-position: 0 100vh; }
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(2, 12, 28, 0.95);
+      border-bottom: 1px solid var(--border-bright);
+      box-shadow: 0 0 30px rgba(0, 229, 255, 0.12);
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border: 2px solid var(--cyan);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 0 15px var(--cyan-glow), inset 0 0 15px var(--cyan-dim);
+      animation: pulse-ring 3s ease-in-out infinite;
+    }
+
+    .logo-icon::before {
+      content: '';
+      width: 14px;
+      height: 14px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--cyan);
+      animation: core-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 15px var(--cyan-glow), inset 0 0 15px var(--cyan-dim); }
+      50% { box-shadow: 0 0 30px var(--cyan-glow), inset 0 0 25px var(--cyan-dim); }
+    }
+
+    @keyframes core-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--cyan);
+      text-shadow: 0 0 20px var(--cyan-glow);
+    }
+
+    .logo-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 3px;
+      margin-top: 2px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+    }
+
+    .nav-link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 8px 18px;
+      border: 1px solid transparent;
+      transition: all 0.3s;
+      position: relative;
+      text-transform: uppercase;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--cyan);
+      border-color: var(--border);
+      background: var(--cyan-dim);
+      box-shadow: 0 0 15px rgba(0,229,255,0.1);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-item {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .status-item span {
+      color: var(--green);
+      display: block;
+      font-size: 11px;
+    }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--green);
+      letter-spacing: 2px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ===== TICKER ===== */
+    .ticker-bar {
+      background: rgba(0, 229, 255, 0.06);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 0;
+      overflow: hidden;
+      position: relative;
+      z-index: 10;
+    }
+
+    .ticker-content {
+      display: flex;
+      gap: 60px;
+      animation: ticker 30s linear infinite;
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 1px;
+    }
+
+    @keyframes ticker {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ticker-item .tick-label { color: var(--cyan); }
+    .ticker-item .tick-warn { color: var(--orange); }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr 260px;
+      gap: 0;
+      height: calc(100vh - 88px);
+      position: relative;
+      z-index: 5;
+    }
+
+    /* ===== LEFT SIDEBAR ===== */
+    .sidebar-left {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .sidebar-left::-webkit-scrollbar { width: 3px; }
+    .sidebar-left::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-left::-webkit-scrollbar-thumb { background: var(--cyan-dim); }
+
+    .panel-header {
+      font-family: var(--font-display);
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--cyan);
+      text-transform: uppercase;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    .mission-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .mission-item:hover {
+      border-color: var(--border);
+      background: var(--cyan-dim);
+    }
+
+    .mission-item.active {
+      border-color: var(--cyan);
+      background: var(--cyan-dim);
+      box-shadow: inset 0 0 15px rgba(0,229,255,0.08);
+    }
+
+    .mission-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+    }
+
+    .mission-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .mission-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 2s infinite; }
+    .mission-dot.standby { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+    .mission-dot.warning { background: var(--orange); box-shadow: 0 0 8px var(--orange); animation: blink 1s infinite; }
+    .mission-dot.critical { background: var(--red); box-shadow: 0 0 10px var(--red); animation: blink 0.5s infinite; }
+
+    .mission-info { flex: 1; min-width: 0; }
+    .mission-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mission-detail {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    .section-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .stats-mini {
+      padding: 10px;
+      background: rgba(0,229,255,0.04);
+      border: 1px solid var(--border);
+    }
+
+    .stats-mini-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(0,229,255,0.06);
+    }
+
+    .stats-mini-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .stats-mini-value {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan);
+    }
+
+    /* ===== CENTER PANEL ===== */
+    .center-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .solar-system-container {
+      position: relative;
+      height: 380px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .solar-canvas-wrapper {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas#solarCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .solar-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    /* Corner brackets */
+    .solar-overlay::before, .solar-overlay::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-color: var(--cyan);
+      border-style: solid;
+      opacity: 0.6;
+    }
+
+    .solar-overlay::before { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+    .solar-overlay::after { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+
+    .solar-label {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-display);
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: var(--cyan);
+      opacity: 0.7;
+    }
+
+    .solar-coords {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .solar-status {
+      position: absolute;
+      bottom: 14px;
+      right: 16px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      text-align: right;
+      line-height: 1.6;
+    }
+
+    /* Charts Row */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .chart-panel {
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-panel:last-child { border-right: none; }
+
+    .chart-title {
+      font-family: var(--font-display);
+      font-size: 8px;
+      letter-spacing: 3px;
+      color: var(--cyan);
+      margin-bottom: 10px;
+      opacity: 0.8;
+    }
+
+    .chart-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* Bottom stats bar */
+    .bottom-stats {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border-top: 1px solid var(--border);
+      background: rgba(2, 8, 20, 0.9);
+      flex-shrink: 0;
+    }
+
+    .stat-cell {
+      padding: 10px 12px;
+      border-right: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .stat-cell:last-child { border-right: none; }
+
+    .stat-val {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .stat-val.cyan { color: var(--cyan); text-shadow: 0 0 12px var(--cyan-glow); }
+    .stat-val.orange { color: var(--orange); text-shadow: 0 0 12px rgba(255,107,43,0.5); }
+    .stat-val.green { color: var(--green); text-shadow: 0 0 12px rgba(0,255,136,0.5); }
+    .stat-val.red { color: var(--red); }
+
+    .stat-lbl {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ===== RIGHT SIDEBAR ===== */
+    .sidebar-right {
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .sidebar-right::-webkit-scrollbar { width: 3px; }
+    .sidebar-right::-webkit-scrollbar-thumb { background: var(--cyan-dim); }
+
+    .probe-card {
+      background: rgba(6, 20, 40, 0.8);
+      border: 1px solid var(--border);
+      padding: 10px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s;
+    }
+
+    .probe-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .probe-card:hover::before { opacity: 1; }
+    .probe-card:hover { border-color: var(--cyan); background: rgba(0,229,255,0.04); }
+
+    .probe-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .probe-name {
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-primary);
+    }
+
+    .probe-badge {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      padding: 2px 6px;
+      letter-spacing: 1px;
+      border-radius: 2px;
+    }
+
+    .badge-active { background: rgba(0,255,136,0.15); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+    .badge-standby { background: rgba(0,229,255,0.1); color: var(--cyan); border: 1px solid rgba(0,229,255,0.3); }
+    .badge-warning { background: rgba(255,107,43,0.15); color: var(--orange); border: 1px solid rgba(255,107,43,0.3); }
+
+    .probe-data {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .probe-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .probe-row-label { color: var(--text-dim); letter-spacing: 1px; }
+    .probe-row-val { color: var(--text-secondary); }
+
+    .probe-bar-wrap { margin-top: 6px; }
+    .probe-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-dim);
+      margin-bottom: 3px;
+    }
+
+    .probe-bar {
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .probe-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), rgba(0,229,255,0.5));
+      box-shadow: 0 0 6px var(--cyan);
+      transition: width 1s ease;
+    }
+
+    .probe-bar-fill.orange { background: linear-gradient(90deg, var(--orange), rgba(255,107,43,0.5)); box-shadow: 0 0 6px var(--orange); }
+    .probe-bar-fill.green { background: linear-gradient(90deg, var(--green), rgba(0,255,136,0.5)); box-shadow: 0 0 6px var(--green); }
+
+    /* Timeline */
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+      padding-left: 16px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: linear-gradient(to bottom, var(--cyan), transparent);
+    }
+
+    .timeline-item {
+      position: relative;
+      padding: 6px 0 6px 12px;
+      border-bottom: 1px solid rgba(0,229,255,0.05);
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -11px;
+      top: 11px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan);
+    }
+
+    .timeline-date {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .timeline-text {
+      font-family: var(--font-body);
+      font-size: 10px;
+      color: var(--text-secondary);
+      margin-top: 1px;
+      line-height: 1.4;
+    }
+
+    /* Animated entry */
+    .fade-in {
+      animation: fadeIn 0.6s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    .fade-in:nth-child(1) { animation-delay: 0.1s; }
+    .fade-in:nth-child(2) { animation-delay: 0.2s; }
+    .fade-in:nth-child(3) { animation-delay: 0.3s; }
+    .fade-in:nth-child(4) { animation-delay: 0.4s; }
+    .fade-in:nth-child(5) { animation-delay: 0.5s; }
+    .fade-in:nth-child(6) { animation-delay: 0.6s; }
+
+    /* Discovery alerts */
+    .discovery-alert {
+      padding: 8px 10px;
+      background: rgba(0, 255, 136, 0.06);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-left: 3px solid var(--green);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .discovery-alert.warn {
+      background: rgba(255, 107, 43, 0.06);
+      border-color: rgba(255, 107, 43, 0.2);
+      border-left-color: var(--orange);
+    }
+
+    .alert-icon {
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .alert-text {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      letter-spacing: 0.5px;
+    }
+
+    .alert-time {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* Top right corner decorators */
+    .corner-tl, .corner-tr, .corner-bl, .corner-br {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: var(--cyan);
+      border-style: solid;
+      opacity: 0.4;
+    }
+    .corner-tl { top: 4px; left: 4px; border-width: 1px 0 0 1px; }
+    .corner-tr { top: 4px; right: 4px; border-width: 1px 1px 0 0; }
+    .corner-bl { bottom: 4px; left: 4px; border-width: 0 0 1px 1px; }
+    .corner-br { bottom: 4px; right: 4px; border-width: 0 1px 1px 0; }
+
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo-area">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text">NEXUS</div>
+      <div class="logo-sub">SPACE MISSION TRACKER</div>
+    </div>
+  </div>
+
+  <nav class="nav-links">
+    <a class="nav-link active" href="index.html">MISSION CTRL</a>
+    <a class="nav-link" href="Mars.html">MARS ROVER</a>
+    <a class="nav-link" href="Blackhole.html">DEEP SPACE</a>
+  </nav>
+
+  <div class="header-status">
+    <div class="status-item">UTC TIME <span id="utcTime">--:--:--</span></div>
+    <div class="status-item">MISSIONS <span>14 ACTIVE</span></div>
+    <div class="live-indicator"><div class="live-dot"></div> LIVE FEED</div>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker-bar">
+  <div class="ticker-content">
+    <span class="ticker-item"><span class="tick-label">▶ VOYAGER 1</span> — 23.4 BILLION KM FROM EARTH — STATUS: NOMINAL</span>
+    <span class="ticker-item"><span class="tick-warn">⚠ PERSEVERANCE</span> — DUST STORM DETECTED IN JEZERO CRATER — STANDBY MODE</span>
+    <span class="ticker-item"><span class="tick-label">▶ JWST</span> — CAPTURING EXOPLANET ATMOSPHERE DATA — PROCESSING</span>
+    <span class="ticker-item"><span class="tick-label">▶ ARTEMIS III</span> — T-180 DAYS TO LUNAR TOUCHDOWN</span>
+    <span class="ticker-item"><span class="tick-label">▶ NEW HORIZONS</span> — KUIPER BELT TRANSIT — 55.3 AU FROM SUN</span>
+    <span class="ticker-item"><span class="tick-warn">⚠ CHANDRAYAAN-3</span> — LUNAR NIGHT SURVIVAL CHECK — AWAITING RESPONSE</span>
+    <!-- duplicate for seamless loop -->
+    <span class="ticker-item"><span class="tick-label">▶ VOYAGER 1</span> — 23.4 BILLION KM FROM EARTH — STATUS: NOMINAL</span>
+    <span class="ticker-item"><span class="tick-warn">⚠ PERSEVERANCE</span> — DUST STORM DETECTED IN JEZERO CRATER — STANDBY MODE</span>
+    <span class="ticker-item"><span class="tick-label">▶ JWST</span> — CAPTURING EXOPLANET ATMOSPHERE DATA — PROCESSING</span>
+    <span class="ticker-item"><span class="tick-label">▶ ARTEMIS III</span> — T-180 DAYS TO LUNAR TOUCHDOWN</span>
+    <span class="ticker-item"><span class="tick-label">▶ NEW HORIZONS</span> — KUIPER BELT TRANSIT — 55.3 AU FROM SUN</span>
+    <span class="ticker-item"><span class="tick-warn">⚠ CHANDRAYAAN-3</span> — LUNAR NIGHT SURVIVAL CHECK — AWAITING RESPONSE</span>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main-layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar-left">
+    <div class="panel-header">● ACTIVE MISSIONS</div>
+
+    <div class="mission-item active fade-in">
+      <div class="mission-dot active"></div>
+      <div class="mission-info">
+        <div class="mission-name">PERSEVERANCE</div>
+        <div class="mission-detail">MARS ROVER · SOL 1468</div>
+      </div>
+    </div>
+
+    <div class="mission-item fade-in">
+      <div class="mission-dot active"></div>
+      <div class="mission-info">
+        <div class="mission-name">JWST</div>
+        <div class="mission-detail">DEEP SPACE · L2 ORBIT</div>
+      </div>
+    </div>
+
+    <div class="mission-item fade-in">
+      <div class="mission-dot warning"></div>
+      <div class="mission-info">
+        <div class="mission-name">INGENUITY</div>
+        <div class="mission-detail">MARS HELI · GROUNDED</div>
+      </div>
+    </div>
+
+    <div class="mission-item fade-in">
+      <div class="mission-dot standby"></div>
+      <div class="mission-info">
+        <div class="mission-name">CURIOSITY</div>
+        <div class="mission-detail">MARS ROVER · SOL 4160</div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="panel-header">● DEEP SPACE PROBES</div>
+
+    <div class="mission-item fade-in">
+      <div class="mission-dot active"></div>
+      <div class="mission-info">
+        <div class="mission-name">VOYAGER 1</div>
+        <div class="mission-detail">INTERSTELLAR · 23.4B KM</div>
+      </div>
+    </div>
+
+    <div class="mission-item fade-in">
+      <div class="mission-dot active"></div>
+      <div class="mission-info">
+        <div class="mission-name">VOYAGER 2</div>
+        <div class="mission-detail">HELIOPAUSE · 19.7B KM</div>
+      </div>
+    </div>
+
+    <div class="mission-item fade-in">
+      <div class="mission-dot standby"></div>
+      <div class="mission-info">
+        <div class="mission-name">NEW HORIZONS</div>
+        <div class="mission-detail">KUIPER BELT · 55.3 AU</div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="panel-header">● DISCOVERIES</div>
+
+    <div class="stats-mini">
+      <div class="stats-mini-row"><span class="stats-mini-label">MARS SURFACE</span><span class="stats-mini-value">847</span></div>
+      <div class="stats-mini-row"><span class="stats-mini-label">EXOPLANETS</span><span class="stats-mini-value">5,674</span></div>
+      <div class="stats-mini-row"><span class="stats-mini-label">BLACK HOLES</span><span class="stats-mini-value">21</span></div>
+      <div class="stats-mini-row"><span class="stats-mini-label">MOON SAMPLES</span><span class="stats-mini-value">382 kg</span></div>
+      <div class="stats-mini-row"><span class="stats-mini-label">GALAXIES MAPPED</span><span class="stats-mini-value">1.2M</span></div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="panel-header">● ALERTS</div>
+
+    <div class="discovery-alert">
+      <div class="alert-icon">◈</div>
+      <div>
+        <div class="alert-text">Organic molecules detected in Jezero Crater sample</div>
+        <div class="alert-time">06:14 UTC — HIGH PRIORITY</div>
+      </div>
+    </div>
+
+    <div class="discovery-alert warn">
+      <div class="alert-icon">⚡</div>
+      <div>
+        <div class="alert-text">Solar wind increase 40% above baseline</div>
+        <div class="alert-time">04:52 UTC — MONITOR</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER PANEL -->
+  <main class="center-panel">
+
+    <!-- Solar System -->
+    <div class="solar-system-container">
+      <div class="solar-canvas-wrapper">
+        <canvas id="solarCanvas"></canvas>
+      </div>
+      <div class="solar-overlay"></div>
+      <div class="solar-label">INNER SOLAR SYSTEM — REAL-TIME SIMULATION</div>
+      <div class="solar-coords">
+        <div>SYS.REF: J2000.0</div>
+        <div id="simDate">DATE: --</div>
+        <div>SCALE: 1AU = 120px</div>
+      </div>
+      <div class="solar-status">
+        <div>PROBES: 8 TRACKED</div>
+        <div>MISSIONS: 14 ACTIVE</div>
+        <div>FEED: LIVE</div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+      <div class="chart-panel">
+        <div class="corner-tl"></div><div class="corner-tr"></div><div class="corner-bl"></div><div class="corner-br"></div>
+        <div class="chart-title">▸ MISSION TELEMETRY — 12H FEED</div>
+        <div class="chart-wrap">
+          <canvas id="telemetryChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="corner-tl"></div><div class="corner-tr"></div><div class="corner-bl"></div><div class="corner-br"></div>
+        <div class="chart-title">▸ MISSION TYPE DISTRIBUTION</div>
+        <div class="chart-wrap">
+          <canvas id="missionChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Stats Bar -->
+    <div class="bottom-stats">
+      <div class="stat-cell">
+        <div class="stat-val cyan" id="counterMissions">0</div>
+        <div class="stat-lbl">Active Missions</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val orange" id="counterDistance">0</div>
+        <div class="stat-lbl">AU Covered</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val green" id="counterDiscoveries">0</div>
+        <div class="stat-lbl">Discoveries</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val cyan" id="counterProbes">0</div>
+        <div class="stat-lbl">Probes Active</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val orange" id="counterExo">0</div>
+        <div class="stat-lbl">Exoplanets</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val green" id="counterBH">0</div>
+        <div class="stat-lbl">Black Holes</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT SIDEBAR -->
+  <aside class="sidebar-right">
+    <div class="panel-header">● PROBE STATUS</div>
+
+    <div class="probe-card fade-in">
+      <div class="corner-tl"></div><div class="corner-br"></div>
+      <div class="probe-header">
+        <div class="probe-name">VOYAGER 1</div>
+        <div class="probe-badge badge-active">ACTIVE</div>
+      </div>
+      <div class="probe-data">
+        <div class="probe-row"><span class="probe-row-label">DISTANCE</span><span class="probe-row-val">23.4B KM</span></div>
+        <div class="probe-row"><span class="probe-row-label">VELOCITY</span><span class="probe-row-val">17.0 KM/S</span></div>
+        <div class="probe-row"><span class="probe-row-label">SIGNAL LAG</span><span class="probe-row-val">21.7 HRS</span></div>
+      </div>
+      <div class="probe-bar-wrap">
+        <div class="probe-bar-label"><span>POWER</span><span>68%</span></div>
+        <div class="probe-bar"><div class="probe-bar-fill" style="width:68%"></div></div>
+      </div>
+    </div>
+
+    <div class="probe-card fade-in">
+      <div class="corner-tl"></div><div class="corner-br"></div>
+      <div class="probe-header">
+        <div class="probe-name">JWST</div>
+        <div class="probe-badge badge-active">ACTIVE</div>
+      </div>
+      <div class="probe-data">
+        <div class="probe-row"><span class="probe-row-label">ORBIT</span><span class="probe-row-val">L2 POINT</span></div>
+        <div class="probe-row"><span class="probe-row-label">TEMP</span><span class="probe-row-val">-233°C</span></div>
+        <div class="probe-row"><span class="probe-row-label">TARGET</span><span class="probe-row-val">NGC 4889</span></div>
+      </div>
+      <div class="probe-bar-wrap">
+        <div class="probe-bar-label"><span>FUEL</span><span>92%</span></div>
+        <div class="probe-bar"><div class="probe-bar-fill green" style="width:92%"></div></div>
+      </div>
+    </div>
+
+    <div class="probe-card fade-in">
+      <div class="corner-tl"></div><div class="corner-br"></div>
+      <div class="probe-header">
+        <div class="probe-name">PERSEVERANCE</div>
+        <div class="probe-badge badge-warning">STANDBY</div>
+      </div>
+      <div class="probe-data">
+        <div class="probe-row"><span class="probe-row-label">SOL DAY</span><span class="probe-row-val">1468</span></div>
+        <div class="probe-row"><span class="probe-row-label">TEMP</span><span class="probe-row-val">-63°C</span></div>
+        <div class="probe-row"><span class="probe-row-label">SAMPLES</span><span class="probe-row-val">23 CACHED</span></div>
+      </div>
+      <div class="probe-bar-wrap">
+        <div class="probe-bar-label"><span>BATTERY</span><span>54%</span></div>
+        <div class="probe-bar"><div class="probe-bar-fill orange" style="width:54%"></div></div>
+      </div>
+    </div>
+
+    <div class="probe-card fade-in">
+      <div class="corner-tl"></div><div class="corner-br"></div>
+      <div class="probe-header">
+        <div class="probe-name">NEW HORIZONS</div>
+        <div class="probe-badge badge-standby">CRUISING</div>
+      </div>
+      <div class="probe-data">
+        <div class="probe-row"><span class="probe-row-label">POSITION</span><span class="probe-row-val">55.3 AU</span></div>
+        <div class="probe-row"><span class="probe-row-label">VELOCITY</span><span class="probe-row-val">14.0 KM/S</span></div>
+        <div class="probe-row"><span class="probe-row-label">SIGNAL</span><span class="probe-row-val">NOMINAL</span></div>
+      </div>
+      <div class="probe-bar-wrap">
+        <div class="probe-bar-label"><span>POWER</span><span>76%</span></div>
+        <div class="probe-bar"><div class="probe-bar-fill" style="width:76%"></div></div>
+      </div>
+    </div>
+
+    <div class="panel-header" style="margin-top: 4px;">● MISSION TIMELINE</div>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-date">MAR 2025</div>
+        <div class="timeline-text">JWST confirms carbon signatures in TRAPPIST-1e atmosphere</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-date">FEB 2025</div>
+        <div class="timeline-text">Perseverance completes 23rd core sample extraction</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-date">JAN 2025</div>
+        <div class="timeline-text">New Horizons enters extended Kuiper Belt mission phase</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-date">DEC 2024</div>
+        <div class="timeline-text">Artemis III crew selection finalized — 4 astronauts</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-date">NOV 2024</div>
+        <div class="timeline-text">Voyager 1 signal anomaly resolved — full comm restored</div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+  // ===== UTC CLOCK =====
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('utcTime').textContent =
+      now.toUTCString().split(' ')[4];
+    document.getElementById('simDate').textContent =
+      'DATE: ' + now.toISOString().split('T')[0];
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ===== COUNTER ANIMATION =====
+  function animateCounter(el, target, suffix = '') {
+    let current = 0;
+    const step = target / 60;
+    const timer = setInterval(() => {
+      current += step;
+      if (current >= target) {
+        current = target;
+        clearInterval(timer);
+      }
+      el.textContent = Math.floor(current).toLocaleString() + suffix;
+    }, 25);
+  }
+
+  setTimeout(() => {
+    animateCounter(document.getElementById('counterMissions'), 14);
+    animateCounter(document.getElementById('counterDistance'), 847);
+    animateCounter(document.getElementById('counterDiscoveries'), 1247);
+    animateCounter(document.getElementById('counterProbes'), 8);
+    animateCounter(document.getElementById('counterExo'), 5674);
+    animateCounter(document.getElementById('counterBH'), 21);
+  }, 300);
+
+  // ===== SOLAR SYSTEM CANVAS =====
+  const canvas = document.getElementById('solarCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function resizeCanvas() {
+    canvas.width = canvas.parentElement.offsetWidth;
+    canvas.height = canvas.parentElement.offsetHeight;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  const planets = [
+    { name: 'SUN', r: 0, size: 22, color: '#FFA500', glowColor: 'rgba(255,165,0,0.5)', speed: 0, angle: 0, hasRing: false },
+    { name: 'MER', r: 55, size: 4, color: '#b0b0b0', glowColor: 'rgba(176,176,176,0.4)', speed: 0.048, angle: Math.random() * Math.PI * 2 },
+    { name: 'VEN', r: 80, size: 6, color: '#e8c97e', glowColor: 'rgba(232,201,126,0.4)', speed: 0.035, angle: Math.random() * Math.PI * 2 },
+    { name: 'EAR', r: 108, size: 6.5, color: '#4da6ff', glowColor: 'rgba(77,166,255,0.4)', speed: 0.029, angle: Math.random() * Math.PI * 2 },
+    { name: 'MAR', r: 140, size: 5, color: '#e8603c', glowColor: 'rgba(232,96,60,0.4)', speed: 0.024, angle: Math.random() * Math.PI * 2 },
+    { name: 'JUP', r: 200, size: 13, color: '#c88b3a', glowColor: 'rgba(200,139,58,0.4)', speed: 0.013, angle: Math.random() * Math.PI * 2, hasStripes: true },
+    { name: 'SAT', r: 252, size: 11, color: '#e0c87a', glowColor: 'rgba(224,200,122,0.4)', speed: 0.009, angle: Math.random() * Math.PI * 2, hasRing: true },
+  ];
+
+  const probes = [
+    { name: 'VOY1', r: 310, size: 3, color: '#00e5ff', speed: 0.003, angle: 2.1, label: true },
+    { name: 'JWST', r: 108, size: 3, color: '#00ff88', speed: 0.029, angle: 1.2, isL2: true },
+  ];
+
+  let animFrame = 0;
+
+  function drawSolarSystem() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const scale = Math.min(w, h * 1.3) / 650;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background glow
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 300 * scale);
+    bgGrad.addColorStop(0, 'rgba(255, 140, 0, 0.06)');
+    bgGrad.addColorStop(0.5, 'rgba(0, 50, 100, 0.04)');
+    bgGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid lines (subtle)
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < w; i += 40 * scale) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, h);
+      ctx.stroke();
+    }
+    for (let j = 0; j < h; j += 40 * scale) {
+      ctx.beginPath();
+      ctx.moveTo(0, j);
+      ctx.lineTo(w, j);
+      ctx.stroke();
+    }
+
+    // Orbit rings
+    planets.slice(1).forEach(p => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, p.r * scale, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 8]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Draw planets
+    planets.forEach((p, i) => {
+      if (i > 0) p.angle += p.speed * 0.3;
+      const x = cx + Math.cos(p.angle) * p.r * scale;
+      const y = cy + Math.sin(p.angle) * p.r * scale;
+      const s = p.size * scale;
+
+      // Glow
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, s * 2.5);
+      grd.addColorStop(0, p.glowColor || 'transparent');
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(x, y, s * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Planet body
+      ctx.beginPath();
+      ctx.arc(x, y, s, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+
+      // Saturn ring
+      if (p.hasRing) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, s * 2.2, s * 0.6, -0.3, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(224,200,122,0.5)';
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+      }
+
+      // Label
+      if (i > 0 && s > 3) {
+        ctx.fillStyle = 'rgba(0,229,255,0.5)';
+        ctx.font = `${8 * scale}px 'Share Tech Mono'`;
+        ctx.fillText(p.name, x + s + 3, y + 3);
+      }
+    });
+
+    // Draw probes
+    probes.forEach(pr => {
+      pr.angle += pr.speed * 0.3;
+      const x = cx + Math.cos(pr.angle) * pr.r * scale;
+      const y = cy + Math.sin(pr.angle) * pr.r * scale;
+      const s = pr.size * scale;
+
+      // Probe dot
+      ctx.beginPath();
+      ctx.arc(x, y, s, 0, Math.PI * 2);
+      ctx.fillStyle = pr.color;
+      ctx.fill();
+
+      // Probe glow
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, s * 3);
+      grd.addColorStop(0, pr.color.replace(')', ', 0.5)').replace('rgb', 'rgba'));
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(x, y, s * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Probe label
+      ctx.fillStyle = pr.color;
+      ctx.font = `${7 * scale}px 'Share Tech Mono'`;
+      ctx.fillText(pr.name, x + s + 3, y - 3);
+    });
+
+    // Sun corona
+    const sunGrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 80 * scale);
+    sunGrd.addColorStop(0, 'rgba(255,255,200,1)');
+    sunGrd.addColorStop(0.2, 'rgba(255,165,0,0.8)');
+    sunGrd.addColorStop(0.5, 'rgba(255,100,0,0.3)');
+    sunGrd.addColorStop(1, 'transparent');
+    ctx.fillStyle = sunGrd;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 80 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sun body
+    ctx.beginPath();
+    ctx.arc(cx, cy, 22 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff5cc';
+    ctx.fill();
+
+    // Cross-hair overlay
+    ctx.strokeStyle = 'rgba(0,229,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 280 * scale, cy);
+    ctx.lineTo(cx + 280 * scale, cy);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 180 * scale);
+    ctx.lineTo(cx, cy + 180 * scale);
+    ctx.stroke();
+
+    animFrame++;
+    requestAnimationFrame(drawSolarSystem);
+  }
+  drawSolarSystem();
+
+  // ===== TELEMETRY CHART =====
+  const hours = Array.from({length: 24}, (_, i) => `${String(i).padStart(2,'0')}:00`);
+  const telCtx = document.getElementById('telemetryChart').getContext('2d');
+  new Chart(telCtx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [
+        {
+          label: 'PERSEVERANCE',
+          data: hours.map(() => 60 + Math.random() * 30),
+          borderColor: '#ff6b2b',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: true,
+          backgroundColor: 'rgba(255,107,43,0.06)',
+        },
+        {
+          label: 'JWST',
+          data: hours.map(() => 70 + Math.random() * 25),
+          borderColor: '#00ff88',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: true,
+          backgroundColor: 'rgba(0,255,136,0.06)',
+        },
+        {
+          label: 'VOYAGER 1',
+          data: hours.map(() => 40 + Math.random() * 20),
+          borderColor: '#00e5ff',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: true,
+          backgroundColor: 'rgba(0,229,255,0.06)',
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 1500, easing: 'easeInOutQuart' },
+      plugins: {
+        legend: {
+          labels: {
+            color: 'rgba(126, 184, 212, 0.7)',
+            font: { family: "'Share Tech Mono'", size: 9 },
+            boxWidth: 12,
+            padding: 12,
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: 'rgba(58,107,135,0.8)', font: { family: "'Share Tech Mono'", size: 7 }, maxTicksLimit: 8 },
+          grid: { color: 'rgba(0,229,255,0.06)' },
+          border: { color: 'rgba(0,229,255,0.15)' },
+        },
+        y: {
+          ticks: { color: 'rgba(58,107,135,0.8)', font: { family: "'Share Tech Mono'", size: 8 } },
+          grid: { color: 'rgba(0,229,255,0.06)' },
+          border: { color: 'rgba(0,229,255,0.15)' },
+        }
+      }
+    }
+  });
+
+  // ===== MISSION DISTRIBUTION CHART =====
+  const missionCtx = document.getElementById('missionChart').getContext('2d');
+  new Chart(missionCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['MARS OPS', 'DEEP SPACE', 'LUNAR', 'EARTH ORBIT', 'SOLAR OBS'],
+      datasets: [{
+        data: [4, 3, 2, 3, 2],
+        backgroundColor: [
+          'rgba(255,107,43,0.7)',
+          'rgba(0,229,255,0.7)',
+          'rgba(200,200,200,0.5)',
+          'rgba(0,255,136,0.7)',
+          'rgba(255,200,0,0.7)',
+        ],
+        borderColor: [
+          '#ff6b2b', '#00e5ff', '#c8c8c8', '#00ff88', '#ffc800',
+        ],
+        borderWidth: 1.5,
+        hoverBorderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 1800, animateRotate: true, easing: 'easeInOutQuart' },
+      cutout: '65%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: 'rgba(126,184,212,0.8)',
+            font: { family: "'Share Tech Mono'", size: 8 },
+            boxWidth: 10,
+            padding: 8,
+          }
+        }
+      }
+    }
+  });
+
+  // ===== RANDOM DATA REFRESH =====
+  setInterval(() => {
+    // Animate probe bars subtly
+  }, 5000);
+</script>
+</body>
+</html>

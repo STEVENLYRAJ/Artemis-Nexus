@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArtemisNexus — Discoveries</title>
+<link rel="stylesheet" href="ArtemisNexus-style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ArtemisAPI.js"></script>
+<style>
+.layout{display:grid;grid-template-columns:250px 1fr;height:calc(100vh - 70px);position:relative;z-index:5;}
+.left-col{background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.center-col{display:flex;flex-direction:column;overflow:hidden;}
+.controls-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.table-wrap{flex:1;overflow-y:auto;}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5;}
+
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(2,8,20,.95);}
+.stats-strip .nxs-stat-big{border-right:1px solid var(--border);padding:12px 6px;}
+
+.disc-card{padding:14px;border-bottom:1px solid rgba(0,229,255,0.08);transition:all .2s;cursor:pointer;}
+.disc-card:hover{background:rgba(0,229,255,0.05);}
+.disc-title{font-family:var(--font-display);font-size:11px;color:var(--cyan);margin-bottom:6px;letter-spacing:1px;}
+.disc-meta{font-family:var(--font-mono);font-size:9px;color:var(--text-dim);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<header class="nxs-header">
+  <div class="nxs-logo"><div class="nxs-logo-icon"></div>
+    <div><div class="nxs-logo-text">ArtemisNexus</div><div class="nxs-logo-sub">TECH & DISCOVERIES DESK</div></div>
+  </div>
+  <div id="navMount"></div>
+  <div class="nxs-hdr-right">
+    <div class="nxs-stat">API SOURCE<span id="apiSource">LIVE NASA API</span></div>
+    <div class="nxs-live"><div class="nxs-live-dot"></div>SYNCED</div>
+  </div>
+</header>
+<div class="nxs-ticker"><div class="nxs-ticker-inner" id="ticker"></div></div>
+
+<div class="layout">
+  <!-- LEFT PANEL -->
+  <div class="left-col">
+    <div class="nxs-panel-hdr">● TOP DISCOVERIES FEED</div>
+    <div id="feedList" class="nxs-loading"><div class="nxs-spinner"></div></div>
+  </div>
+
+  <!-- CENTER PANEL -->
+  <div class="center-col">
+    <div class="stats-strip">
+      <div class="nxs-stat-big"><div class="val sv-cyan" id="sc-total">—</div><div class="lbl">TOTAL ENTRIES</div></div>
+      <div class="nxs-stat-big"><div class="val sv-green" id="sc-missions">—</div><div class="lbl">MISSIONS INVOLVED</div></div>
+      <div class="nxs-stat-big"><div class="val sv-orange" id="sc-agencies">—</div><div class="lbl">AGENCIES</div></div>
+      <div class="nxs-stat-big"><div class="val sv-purple" id="sc-latest">—</div><div class="lbl">MOST RECENT YEAR</div></div>
+    </div>
+    
+    <div class="controls-bar">
+      <div class="nxs-filters">
+        <button class="nxs-fbtn active" onclick="filterBy('all')">ALL DISCOVERIES</button>
+        <button class="nxs-fbtn" onclick="filterBy('NASA')">NASA</button>
+        <button class="nxs-fbtn" onclick="filterBy('ESA')">ESA</button>
+      </div>
+      <input class="nxs-search" id="searchQ" placeholder="SEARCH TITLE/MISSION..." style="width:200px;" oninput="applyFilters()">
+      <button class="nxs-fbtn" onclick="loadJavaAPI()" style="margin-left:auto;">↺ PULL FROM JAVA DB</button>
+    </div>
+
+    <div class="table-wrap">
+      <div class="tbl-top">
+        <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--cyan);opacity:.8;">● DISCOVERIES DATABASE</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rcount">0 records</span>
+      </div>
+      <div id="tableLoading" class="nxs-loading"><div class="nxs-spinner"></div><div class="nxs-loading-text">FETCHING DATA...</div></div>
+      <table class="nxs-table" id="dataTable" style="display:none;">
+        <thead><tr><th>TITLE</th><th>MISSION</th><th>AGENCY</th><th>YEAR</th><th>INSTRUMENT / TECH</th><th>TARGET</th></tr></thead>
+        <tbody id="tableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('discoveries');
+const t = '▶ NEW DATA: JWST Confirms Water vapor on Exoplanet K2-18b&nbsp;&nbsp;●&nbsp;&nbsp;▶ PERSEVERANCE: High concentration of organics in Jezero sample&nbsp;&nbsp;●&nbsp;&nbsp;▶ NASA TechTransfer API linked';
+document.getElementById('ticker').innerHTML = `<span>${t}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${t}</span>`;
+
+let allData = [
+  {title:'Organic Molecules Detected in Jezero Crater', mission:'Perseverance', agency:'NASA', year:'2026', instrument:'SHERLOC', planet:'Mars'},
+  {title:'Water Vapor in K2-18b Atmosphere', mission:'JWST', agency:'NASA/ESA', year:'2025', instrument:'NIRISS', planet:'K2-18b'},
+  {title:'Carbon Dioxide on TRAPPIST-1e', mission:'JWST', agency:'NASA/ESA', year:'2026', instrument:'NIRSpec', planet:'TRAPPIST-1e'},
+  {title:'Underground Liquid Water Radar Signature', mission:'Mars Express', agency:'ESA', year:'2018', instrument:'MARSIS', planet:'Mars'},
+  {title:'Ice Volcanoes on Pluto Mapped', mission:'New Horizons', agency:'NASA', year:'2015', instrument:'LEISA', planet:'Pluto'},
+  {title:'Methane Seasonal Variation', mission:'Curiosity', agency:'NASA', year:'2019', instrument:'SAM', planet:'Mars'},
+  {title:'Sulfur Crystal Deposits Found', mission:'Curiosity', agency:'NASA', year:'2024', instrument:'LIBS', planet:'Mars'},
+  {title:'First Exoplanet Atmosphere (Direct Imaging)', mission:'JWST', agency:'NASA/ESA', year:'2023', instrument:'MIRI', planet:'HR 8799 e'},
+  {title:'Titan Hydrocarbon Lakes Mapped', mission:'Cassini', agency:'NASA', year:'2014', instrument:'RADAR', planet:'Titan'},
+  {title:'Ganymede Subsurface Ocean Confirmed', mission:'Hubble', agency:'NASA/ESA', year:'2015', instrument:'STIS', planet:'Ganymede'},
+  {title:'Phosphine in Venus Atmosphere', mission:'JCMT/ALMA', agency:'ESA/UKSA', year:'2020', instrument:'ALMA', planet:'Venus'},
+  {title:'First XRay Black Hole Merger Observed', mission:'INTEGRAL', agency:'ESA', year:'2023', instrument:'IBIS', planet:'NGC 7727'},
+  {title:'Organic Matter on Asteroid Ryugu', mission:'Hayabusa2', agency:'JAXA', year:'2022', instrument:'Sample Return', planet:'Ryugu'},
+  {title:'Lunar South Pole Water Ice Confirmed', mission:'Chandrayaan-1', agency:'ISRO', year:'2008', instrument:'M3', planet:'Moon'},
+  {title:'Coronal Mass Ejection Impact Predicted', mission:'Aditya-L1', agency:'ISRO', year:'2024', instrument:'VELC', planet:'Earth'},
+];
+let filtered = [...allData];
+
+function renderTable() {
+  document.getElementById('rcount').textContent = filtered.length + ' DISCOVERIES';
+  document.getElementById('sc-total').textContent = allData.length;
+  document.getElementById('sc-missions').textContent = new Set(allData.map(x=>x.mission)).size;
+  document.getElementById('sc-agencies').textContent = new Set(allData.map(x=>x.agency)).size;
+  const years = allData.map(x=>parseInt(x.year)).filter(x=>!isNaN(x));
+  document.getElementById('sc-latest').textContent = years.length ? Math.max(...years) : '—';
+
+  const tb = document.getElementById('tableBody');
+  tb.innerHTML = filtered.map(d => `
+    <tr>
+      <td class="td-name">${d.title}</td>
+      <td class="td-hl">${d.mission}</td>
+      <td class="td-orange">${d.agency}</td>
+      <td>${d.year}</td>
+      <td style="color:var(--text-dim)">${d.instrument}</td>
+      <td class="td-purple">${d.planet}</td>
+    </tr>
+  `).join('');
+  
+  if (allData.length > 0) {
+    document.getElementById('feedList').innerHTML = allData.slice(0,6).map(d => `
+      <div class="disc-card">
+        <div class="disc-title">${d.title}</div>
+        <div class="disc-meta"><span>${d.mission}</span><span style="color:var(--green)">${d.year}</span></div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('feedList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:9px;">NO DATA AVAILABLE</div>';
+  }
+
+  document.getElementById('tableLoading').style.display = 'none';
+  document.getElementById('dataTable').style.display = 'table';
+}
+
+function filterBy(ag) {
+  document.querySelectorAll('.nxs-filters .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  const sq = document.getElementById('searchQ').value.toLowerCase();
+  filtered = allData.filter(d => {
+    if(ag !== 'all' && !d.agency.includes(ag)) return false;
+    if(sq && !d.title.toLowerCase().includes(sq) && !d.mission.toLowerCase().includes(sq)) return false;
+    return true;
+  });
+  renderTable();
+}
+
+function applyFilters() {
+  const activeBtn = document.querySelector('.nxs-filters .active');
+  const ag = activeBtn ? activeBtn.textContent : 'all';
+  filterBy(ag === 'ALL DISCOVERIES' ? 'all' : ag);
+}
+
+async function loadJavaAPI() {
+  document.getElementById('tableLoading').style.display = 'flex';
+  document.getElementById('dataTable').style.display = 'none';
+  
+  const data = await ArtemisNexus.getDiscoveries();
+  if (data && data.length) {
+    // Map ArtemisAPI format to table format
+    allData = data.map(d => ({
+      title: d.title, mission: d.mission, agency: 'JAVA APP', year: d.date.substring(0,4),
+      instrument: d.type, planet: d.priority
+    }));
+    document.getElementById('apiSource').textContent = 'JAVA /API/DISCOVERIES';
+  } else {
+    document.getElementById('apiSource').textContent = 'MOCK OR FLASK ROUTE';
+  }
+  applyFilters();
+}
+
+renderTable();
+</script>
+</body>
+</html>

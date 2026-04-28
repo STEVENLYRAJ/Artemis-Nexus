@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Missions Database</title>
+<link rel="stylesheet" href="ArtemisNexus-style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ArtemisAPI.js"></script>
+<style>
+.layout{display:grid;grid-template-columns:240px 1fr 290px;height:calc(100vh - 70px);position:relative;z-index:5;}
+.left-col{background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.center-col{display:flex;flex-direction:column;overflow:hidden;}
+.right-col{background:var(--bg-panel);border-left:1px solid var(--border);overflow-y:auto;}
+.controls-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.table-wrap{flex:1;overflow-y:auto;}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5;}
+/* Left panel */
+.agency-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-left:2px solid transparent;transition:all .2s;}
+.agency-item:hover,.agency-item.active{background:var(--cyan-dim);border-left-color:var(--cyan);}
+.agency-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.agency-name{font-family:var(--font-mono);font-size:9px;color:var(--text-secondary);letter-spacing:1px;}
+.agency-count{font-family:var(--font-display);font-size:10px;color:var(--cyan);margin-left:auto;}
+/* Right panel */
+.det-panel{padding:14px;border-bottom:1px solid var(--border);}
+.mission-title{font-family:var(--font-display);font-size:12px;font-weight:700;color:var(--cyan);letter-spacing:2px;text-shadow:0 0 10px var(--cyan-glow);margin-bottom:2px;}
+.mission-agency{font-family:var(--font-mono);font-size:9px;color:var(--orange);letter-spacing:2px;margin-bottom:10px;}
+.chart-box{padding:12px;border-bottom:1px solid var(--border);}
+.chart-box-title{font-family:var(--font-display);font-size:7px;letter-spacing:2px;color:var(--cyan);margin-bottom:8px;opacity:.8;}
+.chart-box .nxs-chart-wrap{height:120px;}
+/* Stats strip */
+.stats-strip{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(2,8,20,.95);}
+.stats-strip .nxs-stat-big{border-right:1px solid var(--border);padding:8px 6px;}
+.stats-strip .nxs-stat-big:last-child{border-right:none;}
+.stats-strip .val{font-size:15px;}
+</style>
+</head>
+<body>
+<header class="nxs-header">
+  <div class="nxs-logo"><div class="nxs-logo-icon"></div>
+    <div><div class="nxs-logo-text">NEXUS</div><div class="nxs-logo-sub">GLOBAL MISSIONS DATABASE</div></div>
+  </div>
+  <div id="navMount"></div>
+  <div class="nxs-hdr-right">
+    <div class="nxs-stat">JAVA API<span id="javaSrc">MOCK / YOUR DB</span></div>
+    <div class="nxs-stat">TOTAL<span id="totalMissions">—</span></div>
+    <div class="nxs-live"><div class="nxs-live-dot"></div>LIVE DB</div>
+  </div>
+</header>
+<div class="nxs-ticker"><div class="nxs-ticker-inner" id="ticker"></div></div>
+
+<div class="layout">
+  <!-- LEFT: Agency filter -->
+  <div class="left-col">
+    <div class="nxs-panel-hdr">● FILTER BY AGENCY</div>
+    <div style="flex:1;overflow-y:auto;" id="agencyList"></div>
+    <div style="border-top:1px solid var(--border);padding:12px;">
+      <div class="nxs-panel-hdr" style="border:none;padding:0 0 8px;">● QUICK STATS</div>
+      <div class="nxs-drow"><span class="nxs-drow-lbl">ACTIVE</span><span id="qs-active" class="nxs-drow-val td-good">—</span></div>
+      <div class="nxs-drow"><span class="nxs-drow-lbl">PLANNED</span><span id="qs-planned" class="nxs-drow-val td-purple">—</span></div>
+      <div class="nxs-drow"><span class="nxs-drow-lbl">COMPLETED</span><span id="qs-complete" class="nxs-drow-val td-hl">—</span></div>
+      <div class="nxs-drow"><span class="nxs-drow-lbl">FAILED</span><span id="qs-failed" class="nxs-drow-val td-danger">—</span></div>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center-col">
+    <div class="stats-strip">
+      <div class="nxs-stat-big"><div class="val sv-green" id="sc-active">—</div><div class="lbl">ACTIVE</div></div>
+      <div class="nxs-stat-big"><div class="val sv-purple" id="sc-planned">—</div><div class="lbl">PLANNED</div></div>
+      <div class="nxs-stat-big"><div class="val sv-cyan" id="sc-complete">—</div><div class="lbl">COMPLETE</div></div>
+      <div class="nxs-stat-big"><div class="val sv-orange" id="sc-enroute">—</div><div class="lbl">EN ROUTE</div></div>
+      <div class="nxs-stat-big"><div class="val sv-red" id="sc-failed">—</div><div class="lbl">FAILED</div></div>
+      <div class="nxs-stat-big"><div class="val sv-yellow" id="sc-total">—</div><div class="lbl">TOTAL</div></div>
+    </div>
+    <div class="controls-bar">
+      <div class="nxs-filters" id="fBtns">
+        <button class="nxs-fbtn active" onclick="filterM('all',this)">ALL</button>
+        <button class="nxs-fbtn" onclick="filterM('Active',this)">ACTIVE</button>
+        <button class="nxs-fbtn" onclick="filterM('Planned',this)">PLANNED</button>
+        <button class="nxs-fbtn" onclick="filterM('Complete',this)">COMPLETE</button>
+        <button class="nxs-fbtn" onclick="filterM('En Route',this)">EN ROUTE</button>
+      </div>
+      <input class="nxs-search" id="searchQ" placeholder="SEARCH MISSION…" style="width:160px;" oninput="renderTable()">
+      <select class="nxs-select" id="typeFilter" onchange="renderTable()">
+        <option value="">ALL TYPES</option>
+        <option value="Rover">Rover</option>
+        <option value="Orbiter">Orbiter</option>
+        <option value="Flyby">Flyby</option>
+        <option value="Lander">Lander</option>
+        <option value="Crewed">Crewed</option>
+        <option value="Telescope">Telescope</option>
+        <option value="Sample Return">Sample Return</option>
+      </select>
+      <!-- NOTE: Java integration hook -->
+      <button class="nxs-fbtn" onclick="loadFromJavaAPI()" title="Calls /api/missions from your Spring Boot backend">↺ JAVA API</button>
+    </div>
+    <div class="table-wrap">
+      <div class="tbl-top">
+        <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--cyan);opacity:.8;">● MISSION CATALOG</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rowCount">—</span>
+      </div>
+      <div id="tableLoading" class="nxs-loading"><div class="nxs-spinner"></div><div class="nxs-loading-text">LOADING MISSION DATABASE…</div></div>
+      <table class="nxs-table" id="mTable" style="display:none;">
+        <thead><tr><th>MISSION NAME</th><th>AGENCY</th><th>TYPE</th><th>TARGET</th><th>STATUS</th><th>LAUNCH DATE</th><th>DURATION</th><th>DISCOVERY</th></tr></thead>
+        <tbody id="mTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-col">
+    <div class="det-panel">
+      <div class="mission-title" id="detName">SELECT MISSION</div>
+      <div class="mission-agency" id="detAgency">—</div>
+      <div id="detRows"></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-box-title">▸ MISSIONS BY AGENCY</div>
+      <div class="nxs-chart-wrap"><canvas id="agChart"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-box-title">▸ MISSION STATUS BREAKDOWN</div>
+      <div class="nxs-chart-wrap"><canvas id="statusChart"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-box-title">▸ MISSIONS BY DESTINATION</div>
+      <div class="nxs-chart-wrap"><canvas id="destChart"></canvas></div>
+    </div>
+    <div style="padding:14px;">
+      <div class="nxs-panel-hdr" style="border:none;padding:0 0 8px;">● RECENT DISCOVERIES</div>
+      <div id="discoveryList" class="nxs-loading"><div class="nxs-spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('mission');
+const t = '▶ Java backend integration: uncomment NEXUS.CONFIG.MOCK_MODE=false and hit the JAVA API button to pull from your Spring Boot /api/missions endpoint&nbsp;&nbsp;●&nbsp;&nbsp;▶ ESA BepiColombo arrives Mercury 2025&nbsp;&nbsp;●&nbsp;&nbsp;▶ Artemis IV: SLS Block 1B first flight 2026';
+document.getElementById('ticker').innerHTML = `<span>${t}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${t}</span>`;
+
+// ── COMPREHENSIVE MISSION DATABASE ───────────────────────────
+// NOTE: In production, this comes from your Java backend /api/missions
+const ALL_MISSIONS = [
+  // NASA
+  {id:1,name:'Perseverance',agency:'NASA',type:'Rover',target:'Mars',status:'Active',launch:'2020-07-30',duration:'4+ years',discoveries:'23 samples, organic molecules',cost:'$2.7B',country:'USA'},
+  {id:2,name:'Curiosity',agency:'NASA',type:'Rover',target:'Mars',status:'Active',launch:'2011-11-26',duration:'13+ years',discoveries:'Methane, organic compounds',cost:'$2.5B',country:'USA'},
+  {id:3,name:'Ingenuity',agency:'NASA',type:'Aerial Vehicle',target:'Mars',status:'Offline',launch:'2020-07-30',duration:'3 years',discoveries:'First powered flight on Mars',cost:'$85M',country:'USA'},
+  {id:4,name:'JWST',agency:'NASA/ESA/CSA',type:'Telescope',target:'L2 Deep Field',status:'Active',launch:'2021-12-25',duration:'Ongoing',discoveries:'Exoplanet atmospheres, early universe',cost:'$10B',country:'International'},
+  {id:5,name:'Hubble',agency:'NASA/ESA',type:'Telescope',target:'Deep Space',status:'Active',launch:'1990-04-24',duration:'35+ years',discoveries:'Universe expansion, dark energy',cost:'$4.7B',country:'International'},
+  {id:6,name:'Artemis I',agency:'NASA',type:'Crewed Test',target:'Moon',status:'Complete',launch:'2022-11-16',duration:'25 days',discoveries:'SLS performance validated',cost:'$4.1B',country:'USA'},
+  {id:7,name:'Artemis III',agency:'NASA',type:'Crewed Lunar',target:'Moon',status:'Planned',launch:'2026-09-01',duration:'~30 days',discoveries:'—',cost:'$93B program',country:'USA'},
+  {id:8,name:'Parker Solar Probe',agency:'NASA',type:'Solar Probe',target:'Sun',status:'Active',launch:'2018-08-12',duration:'Ongoing',discoveries:'Solar wind origins, coronal heating',cost:'$1.5B',country:'USA'},
+  {id:9,name:'New Horizons',agency:'NASA',type:'Flyby/KBO Explorer',target:'Kuiper Belt',status:'Active',launch:'2006-01-19',duration:'Ongoing',discoveries:'Pluto geology, Arrokoth contact binary',cost:'$780M',country:'USA'},
+  {id:10,name:'Voyager 1',agency:'NASA',type:'Deep Space Probe',target:'Interstellar',status:'Active',launch:'1977-09-05',duration:'47+ years',discoveries:'Jupiter, Saturn systems; interstellar medium',cost:'$865M (both)',country:'USA'},
+  {id:11,name:'Voyager 2',agency:'NASA',type:'Deep Space Probe',target:'Interstellar',status:'Active',launch:'1977-08-20',duration:'47+ years',discoveries:'Uranus, Neptune systems discovered',cost:'$865M (both)',country:'USA'},
+  {id:12,name:'OSIRIS-REx',agency:'NASA',type:'Sample Return',target:'Asteroid Bennu',status:'Active',launch:'2016-09-08',duration:'Ongoing (OSIRIS-APEX)',discoveries:'250g returned, carbon-rich material',cost:'$1.16B',country:'USA'},
+  {id:13,name:'Europa Clipper',agency:'NASA',type:'Orbiter',target:'Europa (Jupiter)',status:'En Route',launch:'2024-10-14',duration:'6 years',discoveries:'—',cost:'$5B',country:'USA'},
+  {id:14,name:'Gateway Lunar Station',agency:'NASA/ESA',type:'Space Station',target:'Lunar Orbit',status:'Planned',launch:'2027',duration:'Permanent',discoveries:'—',cost:'$40B',country:'International'},
+  {id:15,name:'Mars Sample Return',agency:'NASA/ESA',type:'Sample Return',target:'Mars',status:'Planned',launch:'2028',duration:'10 years',discoveries:'—',cost:'$10B+',country:'International'},
+  // ESA
+  {id:16,name:'BepiColombo',agency:'ESA/JAXA',type:'Orbiter',target:'Mercury',status:'En Route',launch:'2018-10-20',duration:'9 years',discoveries:'—',cost:'€1.65B',country:'EU/Japan'},
+  {id:17,name:'Rosetta/Philae',agency:'ESA',type:'Comet Lander',target:'Comet 67P',status:'Complete',launch:'2004-03-02',duration:'12 years',discoveries:'Organic molecules, water deuterium ratio',cost:'€1.4B',country:'EU'},
+  {id:18,name:'Gaia',agency:'ESA',type:'Astrometry Sat',target:'Milky Way',status:'Active',launch:'2013-12-19',duration:'Ongoing',discoveries:'3D map of 1.8B stars',cost:'€740M',country:'EU'},
+  {id:19,name:'Hera',agency:'ESA',type:'Asteroid Mission',target:'Didymos-Dimorphos',status:'En Route',launch:'2024-10-07',duration:'3 years',discoveries:'—',cost:'€363M',country:'EU'},
+  {id:20,name:'JUICE',agency:'ESA',type:'Orbiter',target:'Jupiter/Ganymede',status:'En Route',launch:'2023-04-14',duration:'13 years',discoveries:'—',cost:'€1.6B',country:'EU'},
+  // ISRO
+  {id:21,name:'Chandrayaan-3',agency:'ISRO',type:'Lunar Lander/Rover',target:'Moon (South Pole)',status:'Complete',launch:'2023-07-14',duration:'14 days active',discoveries:'Sulfur, lunar soil composition',cost:'₹615 Cr (~$74M)',country:'India'},
+  {id:22,name:'Aditya-L1',agency:'ISRO',type:'Solar Observatory',target:'L1 Point',status:'Active',launch:'2023-09-02',duration:'5+ years',discoveries:'Solar wind, coronal mass ejections',cost:'₹400 Cr (~$48M)',country:'India'},
+  {id:23,name:'Mangalyaan (MOM)',agency:'ISRO',type:'Mars Orbiter',target:'Mars',status:'Offline',launch:'2013-11-05',duration:'8 years',discoveries:'Mars methane, atmospheric study',cost:'₹450 Cr (~$74M)',country:'India'},
+  {id:24,name:'Gaganyaan',agency:'ISRO',type:'Crewed Mission',target:'LEO',status:'Planned',launch:'2027',duration:'3 days',discoveries:'—',cost:'₹9,023 Cr (~$1.1B)',country:'India'},
+  {id:25,name:'Chandrayaan-4',agency:'ISRO',type:'Lunar Sample Return',target:'Moon',status:'Planned',launch:'2028',duration:'~2 months',discoveries:'—',cost:'TBD',country:'India'},
+  // CNSA
+  {id:26,name:'Tianwen-1',agency:'CNSA',type:'Mars Orbiter/Rover',target:'Mars',status:'Active',launch:'2020-07-23',duration:'Ongoing',discoveries:'Underground water ice detected',cost:'~$660M',country:'China'},
+  {id:27,name:'Chang\'e 6',agency:'CNSA',type:'Lunar Sample Return',target:'Moon (Far Side)',status:'Complete',launch:'2024-05-03',duration:'53 days',discoveries:'First far-side samples returned',cost:'TBD',country:'China'},
+  {id:28,name:'CSS Tiangong',agency:'CNSA',type:'Space Station',target:'LEO',status:'Active',launch:'2021-04-29',duration:'Permanent',discoveries:'Ongoing microgravity research',cost:'~$8B',country:'China'},
+  // JAXA
+  {id:29,name:'Hayabusa2',agency:'JAXA',type:'Sample Return',target:'Asteroid Ryugu',status:'Complete',launch:'2014-12-03',duration:'6 years',discoveries:'5.4g returned, organic extraterrestrial matter',cost:'¥30B (~$200M)',country:'Japan'},
+  {id:30,name:'SLIM',agency:'JAXA',type:'Lunar Lander',target:'Moon',status:'Complete',launch:'2023-09-07',duration:'~1 year',discoveries:'Smart precision landing system validated',cost:'¥15B (~$100M)',country:'Japan'},
+  // Roscosmos
+  {id:31,name:'Luna-25',agency:'ROSCOSMOS',type:'Lunar Lander',target:'Moon',status:'Failed',launch:'2023-08-11',duration:'—',discoveries:'—',cost:'~$200M',country:'Russia'},
+  {id:32,name:'Spektr-RG',agency:'ROSCOSMOS/DLR',type:'X-Ray Observatory',target:'L2',status:'Partial',launch:'2019-07-13',duration:'Ongoing',discoveries:'Largest X-ray survey — 1M+ sources',cost:'€1B',country:'Russia/Germany'},
+];
+
+let filtered = [...ALL_MISSIONS], selectedM = null, agencyFilter = 'all', statusFilter = 'all';
+
+function buildAgencyList() {
+  const agencies = ['All', ...new Set(ALL_MISSIONS.map(m => m.agency.split('/')[0]))];
+  document.getElementById('agencyList').innerHTML = agencies.map(ag => {
+    const count = ag === 'All' ? ALL_MISSIONS.length : ALL_MISSIONS.filter(m => m.agency.split('/')[0] === ag).length;
+    return `<div class="agency-item${ag==='All'?' active':''}" onclick="setAgency('${ag}',this)">
+      <div class="agency-dot" style="background:${agencyColor(ag)}"></div>
+      <div class="agency-name">${ag}</div>
+      <div class="agency-count">${count}</div>
+    </div>`;
+  }).join('');
+}
+
+function agencyColor(ag) { const m={'NASA':'#00e5ff','ESA':'#00ff88','ISRO':'#ff6b2b','CNSA':'#ffc040','JAXA':'#b060ff','ROSCOSMOS':'#ff3060','All':'#7eb8d4'}; return m[ag]||'#7eb8d4'; }
+
+function setAgency(ag, el) {
+  document.querySelectorAll('.agency-item').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  agencyFilter = ag;
+  applyFilters();
+}
+
+function filterM(f, btn) {
+  document.querySelectorAll('#fBtns .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  statusFilter = f;
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchQ').value.toLowerCase();
+  const type = document.getElementById('typeFilter').value;
+  filtered = ALL_MISSIONS.filter(m => {
+    if(agencyFilter !== 'all' && agencyFilter !== 'All' && !m.agency.split('/')[0].includes(agencyFilter)) return false;
+    if(statusFilter !== 'all' && m.status !== statusFilter) return false;
+    if(type && !m.type.includes(type)) return false;
+    if(q && !m.name.toLowerCase().includes(q) && !m.target.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  renderTable();
+}
+
+function renderTable() {
+  applyFilters();
+}
+
+function _renderTable() {
+  document.getElementById('rowCount').textContent = `${filtered.length} MISSIONS`;
+  document.getElementById('totalMissions').textContent = ALL_MISSIONS.length;
+  document.getElementById('sc-active').textContent = ALL_MISSIONS.filter(m=>m.status==='Active').length;
+  document.getElementById('sc-planned').textContent = ALL_MISSIONS.filter(m=>m.status==='Planned').length;
+  document.getElementById('sc-complete').textContent = ALL_MISSIONS.filter(m=>m.status==='Complete').length;
+  document.getElementById('sc-enroute').textContent = ALL_MISSIONS.filter(m=>m.status==='En Route').length;
+  document.getElementById('sc-failed').textContent = ALL_MISSIONS.filter(m=>m.status==='Failed').length;
+  document.getElementById('sc-total').textContent = ALL_MISSIONS.length;
+  document.getElementById('qs-active').textContent = ALL_MISSIONS.filter(m=>m.status==='Active').length;
+  document.getElementById('qs-planned').textContent = ALL_MISSIONS.filter(m=>m.status==='Planned').length;
+  document.getElementById('qs-complete').textContent = ALL_MISSIONS.filter(m=>m.status==='Complete').length;
+  document.getElementById('qs-failed').textContent = ALL_MISSIONS.filter(m=>m.status==='Failed').length;
+
+  document.getElementById('mTbody').innerHTML = filtered.map(m => {
+    const sc = {Active:'badge-active',Planned:'badge-planned',Complete:'badge-complete','En Route':'badge-standby',Offline:'badge-offline',Failed:'badge-critical',Partial:'badge-warning'}[m.status]||'badge-standby';
+    return `<tr onclick="selectM(${m.id})" class="${selectedM===m.id?'selected':''}">
+      <td class="td-name">${m.name}</td>
+      <td class="td-orange" style="font-size:8px;">${m.agency}</td>
+      <td style="color:var(--text-secondary);font-size:8px;">${m.type}</td>
+      <td class="td-hl">${m.target}</td>
+      <td><span class="nxs-badge ${sc}">${m.status}</span></td>
+      <td style="color:var(--text-dim);font-size:8px;">${m.launch}</td>
+      <td style="color:var(--text-dim);font-size:8px;">${m.duration}</td>
+      <td style="font-size:8px;color:${m.discoveries!=='—'?'var(--green)':'var(--text-dim)'};max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.discoveries}</td>
+    </tr>`;
+  }).join('');
+}
+// Override applyFilters to actually call the render
+const origApply = applyFilters;
+function applyFilters() {
+  const q = document.getElementById('searchQ').value.toLowerCase();
+  const type = document.getElementById('typeFilter').value;
+  filtered = ALL_MISSIONS.filter(m => {
+    if(agencyFilter !== 'all' && agencyFilter !== 'All' && !m.agency.split('/')[0].includes(agencyFilter)) return false;
+    if(statusFilter !== 'all' && m.status !== statusFilter) return false;
+    if(type && !m.type.includes(type)) return false;
+    if(q && !m.name.toLowerCase().includes(q) && !m.target.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  _renderTable();
+}
+
+function selectM(id) {
+  selectedM = id;
+  const m = ALL_MISSIONS.find(x=>x.id===id);
+  document.getElementById('detName').textContent = m.name.toUpperCase();
+  document.getElementById('detAgency').textContent = m.agency + ' · ' + m.country;
+  document.getElementById('detRows').innerHTML = [
+    ['TYPE', m.type], ['TARGET', m.target], ['STATUS', m.status],
+    ['LAUNCH DATE', m.launch], ['DURATION', m.duration],
+    ['COST', m.cost], ['DISCOVERIES', m.discoveries||'—']
+  ].map(([l,v]) => `<div class="nxs-drow"><span class="nxs-drow-lbl">${l}</span><span class="nxs-drow-val">${v}</span></div>`).join('');
+  applyFilters();
+}
+
+// ── JAVA API HOOK ─────────────────────────────────────────────
+async function loadFromJavaAPI() {
+  document.getElementById('tableLoading').style.display = 'flex';
+  document.getElementById('mTable').style.display = 'none';
+  // This calls your Spring Boot backend!
+  const data = await ArtemisNexus.getMissions();
+  if(data && Array.isArray(data) && data.length > 0) {
+    // Merge Java data into catalog
+    console.log('[NEXUS] Loaded from Java backend:', data.length, 'missions');
+    document.getElementById('javaSrc').textContent = 'JAVA BACKEND';
+  } else {
+    console.log('[NEXUS] Java backend unavailable — using mock data');
+    document.getElementById('javaSrc').textContent = 'MOCK (Java 404)';
+  }
+  document.getElementById('tableLoading').style.display = 'none';
+  document.getElementById('mTable').style.display = 'table';
+  applyFilters();
+}
+
+// Charts
+const agCounts = {}; ALL_MISSIONS.forEach(m=>{ const a=m.agency.split('/')[0]; agCounts[a]=(agCounts[a]||0)+1; });
+new Chart(document.getElementById('agChart'), {
+  type:'doughnut', data:{ labels:Object.keys(agCounts), datasets:[{ data:Object.values(agCounts), backgroundColor:Object.keys(agCounts).map(a=>agencyColor(a)+'99'), borderColor:Object.keys(agCounts).map(a=>agencyColor(a)), borderWidth:1.5 }] },
+  options:{ ...ArtemisNexus.chartDefaults(), cutout:'55%' }
+});
+const stMap = {Active:'#00ff88',Planned:'#b060ff',Complete:'#00e5ff','En Route':'#00c0c0',Offline:'#666688',Failed:'#ff3060',Partial:'#ffc040'};
+const stCounts = {}; ALL_MISSIONS.forEach(m=>{ stCounts[m.status]=(stCounts[m.status]||0)+1; });
+new Chart(document.getElementById('statusChart'), {
+  type:'bar', data:{ labels:Object.keys(stCounts), datasets:[{ data:Object.values(stCounts), backgroundColor:Object.keys(stCounts).map(s=>(stMap[s]||'#888')+'88'), borderColor:Object.keys(stCounts).map(s=>stMap[s]||'#888'), borderWidth:1 }] },
+  options:{ ...ArtemisNexus.chartDefaults(), plugins:{legend:{display:false}} }
+});
+const destCounts = {}; ALL_MISSIONS.forEach(m=>{ const d=m.target.split(' ')[0]; destCounts[d]=(destCounts[d]||0)+1; });
+const topDest = Object.entries(destCounts).sort((a,b)=>b[1]-a[1]).slice(0,7);
+new Chart(document.getElementById('destChart'), {
+  type:'bar', data:{ labels:topDest.map(d=>d[0]), datasets:[{ data:topDest.map(d=>d[1]), backgroundColor:'rgba(0,229,255,.35)', borderColor:'#00e5ff', borderWidth:1 }] },
+  options:{ ...ArtemisNexus.chartDefaults(), indexAxis:'y', plugins:{legend:{display:false}} }
+});
+
+// Discoveries feed from Java backend
+ArtemisNexus.getDiscoveries().then(data => {
+  if(!data) return;
+  document.getElementById('discoveryList').innerHTML = data.map(d => `
+    <div class="nxs-alert${d.priority==='HIGH'?' danger':''}">
+      <div class="nxs-alert-icon">◈</div>
+      <div><div class="nxs-alert-text">${d.title}</div><div class="nxs-alert-time">${d.mission} · ${d.date} · ${d.type}</div></div>
+    </div>`).join('');
+});
+
+// Init
+buildAgencyList();
+document.getElementById('tableLoading').style.display = 'none';
+document.getElementById('mTable').style.display = 'table';
+applyFilters();
+</script>
+</body>
+</html>

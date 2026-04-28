@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><title>ArtemisNexus — Near-Earth Objects</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="ArtemisAPI.js"></script>
+<style th:inline="none">
+:root{--bg:#020810;--panel:rgba(4,18,35,.93);--c:#00e5ff;--cd:rgba(0,229,255,.12);--cg:rgba(0,229,255,.4);--or:#ff6b2b;--gr:#00ff88;--re:#ff2b55;--ye:#ffc040;--t1:#e8f4ff;--t2:#7eb8d4;--t3:#3a6b87;--bo:rgba(0,229,255,.15);--bb:rgba(0,229,255,.45);--fd:'Orbitron',monospace;--fm:'Share Tech Mono',monospace;--fb:'Exo 2',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--t1);font-family:var(--fb);cursor:crosshair;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(1px 1px at 10% 20%,rgba(255,255,255,.5) 0%,transparent 100%),radial-gradient(1px 1px at 70% 40%,rgba(0,229,255,.4) 0%,transparent 100%),radial-gradient(1px 1px at 40% 80%,rgba(255,255,255,.3) 0%,transparent 100%);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.01) 2px,rgba(0,229,255,.01) 4px);pointer-events:none;z-index:999}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--cd)}
+.hdr{position:relative;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:rgba(2,8,20,.97);border-bottom:1px solid var(--bb);flex-wrap:wrap;gap:8px}
+.logo{display:flex;align-items:center;gap:14px}.logo-icon{width:36px;height:36px;border:2px solid var(--c);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px var(--cg);animation:pulse 3s ease-in-out infinite}
+.logo-icon::before{content:'';width:11px;height:11px;background:var(--c);border-radius:50%;box-shadow:0 0 12px var(--c)}
+@keyframes pulse{0%,100%{box-shadow:0 0 15px var(--cg)}50%{box-shadow:0 0 28px var(--cg)}}
+.logo-text{font-family:var(--fd);font-size:20px;font-weight:900;letter-spacing:3px;color:var(--c);text-shadow:0 0 20px var(--cg)}.logo-sub{font-family:var(--fm);font-size:9px;color:var(--t2);letter-spacing:3px}
+nav{display:flex;flex-wrap:wrap;gap:2px}
+nav a{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;color:var(--t2);text-decoration:none;padding:7px 11px;border:1px solid transparent;transition:all .25s;text-transform:uppercase;position:relative}
+nav a:hover,nav a.active{color:var(--c);border-color:var(--bo);background:var(--cd)}
+nav a.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--c);box-shadow:0 0 6px var(--c)}
+.hdr-right{display:flex;align-items:center;gap:14px}.hdr-stat{font-family:var(--fm);font-size:9px;color:var(--t3);letter-spacing:1px}.hdr-stat span{color:var(--c);display:block;font-size:10px}
+.live{display:flex;align-items:center;gap:7px;font-family:var(--fm);font-size:10px;color:var(--gr);letter-spacing:2px}.live-dot{width:7px;height:7px;background:var(--gr);border-radius:50%;box-shadow:0 0 8px var(--gr);animation:blink 1.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.ticker{background:rgba(0,229,255,.05);border-bottom:1px solid var(--bo);padding:5px 0;overflow:hidden;z-index:10;position:relative}
+.ticker-inner{display:flex;gap:60px;animation:scroll 35s linear infinite;white-space:nowrap;font-family:var(--fm);font-size:9px;color:var(--t2)}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tc{color:var(--c)}.tw{color:var(--ye)}
+.layout{display:grid;grid-template-columns:1fr 320px;height:calc(100vh - 88px);position:relative;z-index:5}
+.left-col{display:flex;flex-direction:column;overflow:hidden}.right-col{background:var(--panel);border-left:1px solid var(--bo);overflow-y:auto}
+
+/* Canvas */
+.viz{position:relative;height:280px;background:#000;border-bottom:1px solid var(--bo);flex-shrink:0;overflow:hidden}
+#astCanvas{position:absolute;inset:0;width:100%;height:100%}
+.viz-hud{position:absolute;inset:0;pointer-events:none}
+.viz-hud::before,.viz-hud::after{content:'';position:absolute;width:16px;height:16px;border-color:var(--c);border-style:solid;opacity:.5}
+.viz-hud::before{top:10px;left:10px;border-width:2px 0 0 2px}.viz-hud::after{bottom:10px;right:10px;border-width:0 2px 2px 0}
+.viz-lbl{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:var(--fd);font-size:8px;letter-spacing:3px;color:var(--c);opacity:.6}
+.viz-legend{position:absolute;bottom:12px;left:14px;font-family:var(--fm);font-size:8px;line-height:1.8}
+.viz-stats{position:absolute;bottom:12px;right:14px;font-family:var(--fm);font-size:8px;color:rgba(0,229,255,.5);text-align:right;line-height:1.8}
+
+/* Stats */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--bo);flex-shrink:0;background:rgba(2,8,20,.95)}
+.stat-cell{padding:10px 8px;border-right:1px solid var(--bo);text-align:center}.stat-cell:last-child{border-right:none}
+.stat-val{font-family:var(--fd);font-size:18px;font-weight:700;line-height:1;text-shadow:0 0 12px currentColor}.stat-lbl{font-family:var(--fm);font-size:7px;color:var(--t3);letter-spacing:2px;margin-top:4px}
+.sv-c{color:var(--c)}.sv-r{color:var(--re)}.sv-y{color:var(--ye)}.sv-g{color:var(--gr)}
+
+/* Controls */
+.ctrl-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--bo);flex-shrink:0;flex-wrap:wrap}
+.fbtn{font-family:var(--fm);font-size:8px;letter-spacing:1px;padding:5px 12px;border:1px solid var(--bo);color:var(--t2);cursor:pointer;transition:all .25s;background:transparent;text-transform:uppercase}
+.fbtn:hover,.fbtn.active{background:var(--cd);color:var(--c);border-color:rgba(0,229,255,.4)}
+.search{background:rgba(6,24,46,.8);border:1px solid var(--bo);color:var(--t1);font-family:var(--fm);font-size:10px;padding:5px 10px;outline:none;letter-spacing:1px}.search::placeholder{color:var(--t3)}.search:focus{border-color:var(--c)}
+
+/* Table */
+.tbl-wrap{flex:1;overflow-y:auto}.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--bo);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5}
+.tbl-title{font-family:var(--fd);font-size:8px;letter-spacing:3px;color:var(--c);opacity:.8}.tbl-count{font-family:var(--fm);font-size:9px;color:var(--t3)}
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--fm);font-size:8px;letter-spacing:2px;color:var(--t3);padding:8px 14px;text-align:left;border-bottom:1px solid var(--bo);background:rgba(4,14,30,.7)}
+td{font-family:var(--fm);font-size:9px;padding:9px 14px;color:var(--t2);border-bottom:1px solid rgba(0,229,255,.04)}
+tr:hover td{background:rgba(0,229,255,.04)}
+.td-name{color:var(--t1)}.td-c{color:var(--c)}.td-o{color:var(--or)}.td-g{color:var(--gr)}.td-r{color:var(--re)}.td-y{color:var(--ye)}
+.badge{font-family:var(--fm);font-size:7px;padding:2px 7px;border-radius:2px;letter-spacing:1px}
+.b-haz{background:rgba(255,43,85,.12);color:var(--re);border:1px solid rgba(255,43,85,.3)}
+.b-safe{background:rgba(0,255,136,.1);color:var(--gr);border:1px solid rgba(0,255,136,.25)}
+
+/* Right panel */
+.sec-hdr{font-family:var(--fd);font-size:8px;letter-spacing:3px;color:var(--c);padding:12px 14px;border-bottom:1px solid var(--bo);opacity:.8}
+.drow{display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(0,229,255,.05);font-family:var(--fm);font-size:9px}
+.drow-l{color:var(--t3);letter-spacing:1px}.drow-v{color:var(--t2)}
+.chart-box{padding:12px;border-bottom:1px solid var(--bo)}.chart-title{font-family:var(--fd);font-size:7px;letter-spacing:2px;color:var(--c);margin-bottom:8px;opacity:.8}
+.chart-wrap{height:120px;position:relative}
+.risk-row{display:flex;align-items:center;gap:8px;padding:5px 14px;font-family:var(--fm);font-size:9px;border-bottom:1px solid rgba(0,229,255,.05)}
+.risk-label{width:90px;color:var(--t3);letter-spacing:.5px;font-size:8px}
+.risk-bar-outer{flex:1;height:5px;background:rgba(255,255,255,.07)}.risk-bar-inner{height:100%}
+.risk-val{width:40px;text-align:right;color:var(--t2);font-size:8px}
+.notable{padding:10px 14px;border-bottom:1px solid var(--bo);transition:background .2s;cursor:pointer}
+.notable:hover{background:var(--cd)}.notable-name{font-family:var(--fm);font-size:9px;color:var(--t1);margin-bottom:4px}
+.notable-sub{font-family:var(--fm);font-size:8px;color:var(--t3)}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="logo"><div class="logo-icon"></div>
+    <div><div class="logo-text">ArtemisNexus</div><div class="logo-sub">NEAR-EARTH OBJECT TRACKER</div></div>
+  </div>
+  <nav>
+    <a href="/">MISSION CTRL</a><a href="/mars">MARS ROVER</a><a href="/deep-space">DEEP SPACE</a>
+    <a href="/asteroids" class="active">ASTEROIDS</a><a href="/solar-bodies">SOLAR BODIES</a>
+    <a href="/spacecraft">SPACECRAFT</a><a href="/space-probes">PROBES</a>
+    <a href="/telescopes">TELESCOPES</a><a href="/missions">MISSIONS DB</a><a href="/upcoming-missions">LAUNCHES</a>
+  </nav>
+  <div class="hdr-right">
+    <div class="hdr-stat">NASA NeoWs API<span>JS ENGINE</span></div>
+    <div class="hdr-stat">TRACKED<span id="topTgt">36,000+</span></div>
+    <div class="live"><div class="live-dot"></div>NEO WATCH</div>
+  </div>
+</header>
+<div class="ticker"><div class="ticker-inner">
+  <span><span class="tw">⚠ 99942 APOPHIS:</span> Closest approach 2029-04-13 — miss distance 38,000 km</span>
+  <span><span class="tc">▶ NASA NeoWs:</span> Real API available at api.nasa.gov — replace DEMO_KEY in config</span>
+  <span><span class="tw">⚠ 2024 YR4:</span> Recalculated — impact probability reduced to 0.002%</span>
+  <span><span class="tc">▶ TOTAL KNOWN NEOs:</span> 36,000+ catalogued — PHAs: 2,400+</span>
+  <span><span class="tw">⚠ 99942 APOPHIS:</span> Closest approach 2029-04-13 — miss distance 38,000 km</span>
+  <span><span class="tc">▶ NASA NeoWs:</span> Real API available at api.nasa.gov — replace DEMO_KEY in config</span>
+  <span><span class="tw">⚠ 2024 YR4:</span> Recalculated — impact probability reduced to 0.002%</span>
+  <span><span class="tc">▶ TOTAL KNOWN NEOs:</span> 36,000+ catalogued — PHAs: 2,400+</span>
+</div></div>
+
+<div class="layout">
+  <div class="left-col">
+    <!-- Canvas viz -->
+    <div class="viz">
+      <canvas id="astCanvas"></canvas>
+      <div class="viz-hud"></div>
+      <div class="viz-lbl">NEAR-EARTH APPROACH VISUALIZATION — REAL-TIME</div>
+      <div class="viz-legend">
+        <div style="color:rgba(0,229,255,.6)">● SAFE (&gt;1M km)</div>
+        <div style="color:rgba(255,192,64,.6)">● MONITOR (100k–1M km)</div>
+        <div style="color:rgba(255,43,85,.6)">● HAZARDOUS (PHA)</div>
+      </div>
+      <div class="viz-stats">
+        OBJECTS: <span id="vTotal">10</span><br>
+        HAZARDOUS: <span id="vPha">6</span><br>
+        CLOSEST: <span id="vClose">7,400 KM</span>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-cell"><div class="stat-val sv-c" id="sTotal">10</div><div class="stat-lbl">TOTAL OBJECTS</div></div>
+      <div class="stat-cell"><div class="stat-val sv-r" id="sPha">6</div><div class="stat-lbl">HAZARDOUS (PHA)</div></div>
+      <div class="stat-cell"><div class="stat-val sv-y" id="sClose">7,400</div><div class="stat-lbl">CLOSEST (km)</div></div>
+      <div class="stat-cell"><div class="stat-val sv-g">7 DAY</div><div class="stat-lbl">SCAN WINDOW</div></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="ctrl-bar">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <button class="fbtn active" onclick="filterNeo('all')">ALL</button>
+        <button class="fbtn" onclick="filterNeo('pha')">⚠ PHA ONLY</button>
+        <button class="fbtn" onclick="filterNeo('close')">CLOSE APPROACH</button>
+        <input type="text" id="neoSearch" class="search" placeholder="SEARCH OBJECT…" style="width:180px;" oninput="filterNeo('query')">
+      </div>
+    </div>
+
+    <!-- Table — data from MongoDB via Thymeleaf -->
+    <div class="tbl-wrap">
+      <div class="tbl-top">
+        <span class="tbl-title">● NEO CATALOG</span>
+        <span class="tbl-count" id="tblCount">10 OBJECTS</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>OBJECT NAME</th><th>APPROACH DATE</th><th>DIAMETER (km)</th>
+            <th>VELOCITY (km/h)</th><th>MISS DIST (km)</th><th>HAZARD</th><th>ORBIT</th>
+          </tr>
+        </thead>
+        <tbody id="neoTableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-col">
+    <div class="sec-hdr">● SELECTED OBJECT</div>
+    <div>
+      <div style="padding:14px;border-bottom:1px solid var(--bo);" id="selCard">
+      </div>
+    </div>
+
+    <!-- Risk indicators -->
+    <div class="sec-hdr">● RISK INDICATORS</div>
+    <div class="risk-row"><span class="risk-label">APPROACH DIST</span><div class="risk-bar-outer"><div class="risk-bar-inner" style="width:85%;background:linear-gradient(90deg,#00ff88,rgba(0,255,136,.4));box-shadow:0 0 5px #00ff88;"></div></div><span class="risk-val">LOW</span></div>
+    <div class="risk-row"><span class="risk-label">RELATIVE VEL.</span><div class="risk-bar-outer"><div class="risk-bar-inner" style="width:50%;background:linear-gradient(90deg,#ffc040,rgba(255,192,64,.4));box-shadow:0 0 5px #ffc040;"></div></div><span class="risk-val">MED</span></div>
+    <div class="risk-row"><span class="risk-label">OBJECT SIZE</span><div class="risk-bar-outer"><div class="risk-bar-inner" style="width:25%;background:linear-gradient(90deg,#00e5ff,rgba(0,229,255,.4));box-shadow:0 0 5px #00e5ff;"></div></div><span class="risk-val">LOW</span></div>
+    <div class="risk-row"><span class="risk-label">TORINO SCALE</span><div class="risk-bar-outer"><div class="risk-bar-inner" style="width:8%;background:linear-gradient(90deg,#00ff88,rgba(0,255,136,.4));"></div></div><span class="risk-val">0</span></div>
+
+    <div class="chart-box" style="margin-top:8px;">
+      <div class="chart-title">▸ PHA vs SAFE OBJECTS</div>
+      <div class="chart-wrap"><canvas id="phaChart"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">▸ ORBIT CLASS DISTRIBUTION</div>
+      <div class="chart-wrap"><canvas id="orbitChart"></canvas></div>
+    </div>
+
+    <div class="sec-hdr">● NOTABLE ASTEROIDS</div>
+    <div class="notable">
+      <div class="notable-name">99942 Apophis</div>
+      <div class="notable-sub">MISS: 38,000 km · DATE: 2029-04-13 · <span style="color:var(--re)">⚠ HIGH WATCH</span></div>
+    </div>
+    <div class="notable">
+      <div class="notable-name">2024 YR4</div>
+      <div class="notable-sub">MISS: ~7,000 km · DATE: 2032-12-22 · <span style="color:var(--ye)">MONITOR</span></div>
+    </div>
+    <div class="notable">
+      <div class="notable-name">1950 DA</div>
+      <div class="notable-sub">MISS: &lt;1 LD · DATE: 2880-03-16 · <span style="color:var(--c)">LONG-TERM</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Build canvas vis from mock data
+const asteroids = [
+  { name: '99942 Apophis', approachDate: '2029-04-13', diameterRange: '340m - 370m', velocityFormatted: '107,352', missDistanceKm: 38012, missDistanceFormatted: '38,012 km', potentiallyHazardous: true, orbitClass: 'Aten', nasaId: '2099942' },
+  { name: '2024 YR4', approachDate: '2032-12-22', diameterRange: '40m - 80m', velocityFormatted: '54,200', missDistanceKm: 7400, missDistanceFormatted: '7,400 km', potentiallyHazardous: true, orbitClass: 'Apollo', nasaId: '4343110' },
+  { name: '(101955) Bennu', approachDate: '2135-09-25', diameterRange: '482m - 500m', velocityFormatted: '101,389', missDistanceKm: 298000, missDistanceFormatted: '298,000 km', potentiallyHazardous: true, orbitClass: 'Apollo', nasaId: '2101955' },
+  { name: '2020 CD3', approachDate: '2024-05-18', diameterRange: '1.9m - 3.5m', velocityFormatted: '29,400', missDistanceKm: 1540000, missDistanceFormatted: '1,540,000 km', potentiallyHazardous: false, orbitClass: 'Amor', nasaId: '3839201' },
+  { name: '4179 Toutatis', approachDate: '2069-12-29', diameterRange: '2.5km - 5.4km', velocityFormatted: '124,500', missDistanceKm: 2930000, missDistanceFormatted: '2,930,000 km', potentiallyHazardous: true, orbitClass: 'Apollo', nasaId: '2004179' },
+  { name: '162173 Ryugu', approachDate: '2076-12-06', diameterRange: '865m - 900m', velocityFormatted: '93,024', missDistanceKm: 14500000, missDistanceFormatted: '14,500,000 km', potentiallyHazardous: true, orbitClass: 'Apollo', nasaId: '2162173' },
+  { name: '2010 TK7', approachDate: 'Long-term Trap', diameterRange: '300m - 400m', velocityFormatted: '108,000', missDistanceKm: 24000000, missDistanceFormatted: '24,000,000 km', potentiallyHazardous: false, orbitClass: 'Earth Trojan', nasaId: '3574921' },
+  { name: '3200 Phaethon', approachDate: '2093-12-14', diameterRange: '5.8km', velocityFormatted: '114,800', missDistanceKm: 2914000, missDistanceFormatted: '2,914,000 km', potentiallyHazardous: true, orbitClass: 'Apollo', nasaId: '2003200' },
+  { name: '2022 EB5', approachDate: 'Impacted', diameterRange: '1m - 2m', velocityFormatted: '62,280', missDistanceKm: 0, missDistanceFormatted: '0 km', potentiallyHazardous: false, orbitClass: 'Apollo', nasaId: '5426177' },
+  { name: '2026 XK', approachDate: '2026-11-04', diameterRange: '25m - 50m', velocityFormatted: '41,800', missDistanceKm: 120500, missDistanceFormatted: '120,500 km', potentiallyHazardous: false, orbitClass: 'Amor', nasaId: '4452109' }
+];
+
+let filteredNeos = [...asteroids];
+
+const phaCount = asteroids.filter(a => a.potentiallyHazardous).length;
+const totalObjects = asteroids.length;
+
+function renderNeos() {
+  const tbody = document.getElementById('neoTableBody');
+  tbody.innerHTML = filteredNeos.map(ast => {
+    let distClass = ast.missDistanceKm < 100000 ? 'td-r' : ast.missDistanceKm < 1000000 ? 'td-y' : 'td-g';
+    let hazBadge = ast.potentiallyHazardous ? '<span class="badge b-haz">⚠ PHA</span>' : '<span class="badge b-safe">SAFE</span>';
+    return `
+      <tr>
+        <td class="td-name">${ast.name}</td>
+        <td class="td-c">${ast.approachDate}</td>
+        <td>${ast.diameterRange}</td>
+        <td class="td-o">${ast.velocityFormatted}</td>
+        <td class="${distClass}">${ast.missDistanceFormatted}</td>
+        <td>${hazBadge}</td>
+        <td style="color:var(--t3);font-size:8px;">${ast.orbitClass}</td>
+      </tr>
+    `;
+  }).join('');
+  
+  document.getElementById('tblCount').textContent = filteredNeos.length + ' OBJECTS';
+  
+  if(filteredNeos.length > 0) {
+    let a = filteredNeos[0];
+    let selHaz = a.potentiallyHazardous ? '<span class="badge b-haz">⚠ YES — PHA</span>' : '<span class="badge b-safe">NO</span>';
+    document.getElementById('selCard').innerHTML = `
+        <div style="font-family:var(--fd);font-size:11px;font-weight:700;color:var(--c);letter-spacing:2px;margin-bottom:2px;text-shadow:0 0 10px var(--cg);">${a.name}</div>
+        <div style="font-family:var(--fm);font-size:8px;color:var(--t3);letter-spacing:2px;margin-bottom:10px;">NASA ID: ${a.nasaId}</div>
+        <div class="drow" style="padding:5px 0;"><span class="drow-l">EST. DIAMETER</span><span class="drow-v">${a.diameterRange}</span></div>
+        <div class="drow" style="padding:5px 0;"><span class="drow-l">APPROACH DATE</span><span class="drow-v" style="color:var(--c)">${a.approachDate}</span></div>
+        <div class="drow" style="padding:5px 0;"><span class="drow-l">VELOCITY</span><span class="drow-v" style="color:var(--or)">${a.velocityFormatted} km/h</span></div>
+        <div class="drow" style="padding:5px 0;"><span class="drow-l">MISS DISTANCE</span><span class="drow-v">${a.missDistanceFormatted}</span></div>
+        <div class="drow" style="padding:5px 0;"><span class="drow-l">HAZARDOUS</span>${selHaz}</div>
+        <div class="drow" style="padding:5px 0;"><span class="drow-l">ORBIT CLASS</span><span class="drow-v">${a.orbitClass}</span></div>
+    `;
+  }
+}
+
+function filterNeo(type) {
+  document.querySelectorAll('.ctrl-bar .fbtn').forEach(b => b.classList.remove('active'));
+  if(type !== 'query' && event && event.target) event.target.classList.add('active');
+  
+  let q = document.getElementById('neoSearch').value.toLowerCase();
+  
+  filteredNeos = asteroids.filter(a => {
+    let passBtn = true;
+    if(type === 'pha' || (document.querySelector('.ctrl-bar .fbtn.active')?.textContent.includes('PHA') && type === 'query')) {
+        passBtn = a.potentiallyHazardous;
+    } else if (type === 'close' || (document.querySelector('.ctrl-bar .fbtn.active')?.textContent.includes('CLOSE') && type === 'query')) {
+        passBtn = a.missDistanceKm < 1000000;
+    }
+    
+    let passSrc = q ? a.name.toLowerCase().includes(q) : true;
+    return passBtn && passSrc;
+  });
+  renderNeos();
+}
+
+renderNeos();
+
+// Canvas animation
+const cv = document.getElementById('astCanvas');
+const ctx = cv.getContext('2d');
+function resize(){cv.width=cv.parentElement.offsetWidth;cv.height=cv.parentElement.offsetHeight;}
+resize(); window.addEventListener('resize',resize);
+
+const orbs = Array.from({length: Math.min(asteroids.length, 30) || 15}, (_, i) => ({
+  angle: Math.random()*Math.PI*2, speed: .001+Math.random()*.003,
+  r: 60+Math.random()*120, sz: 2+Math.random()*4,
+  color: (asteroids[i]?.potentiallyHazardous || Math.random()>.7) ? '#ff2b55' : Math.random()>.5 ? '#ffc040' : '#00e5ff'
+}));
+
+function draw(){
+  cv.width=cv.parentElement.offsetWidth; cv.height=cv.parentElement.offsetHeight;
+  const w=cv.width,h=cv.height,cx=w/2,cy=h/2,s=h/300;
+  ctx.clearRect(0,0,w,h);
+  for(let i=0;i<80;i++){ctx.fillStyle='rgba(255,255,255,'+(Math.random()*.4+.05)+')';ctx.fillRect(Math.sin(i*137)*w/2+cx,Math.sin(i*97)*h/2+cy,1,1);}
+  ctx.beginPath();ctx.arc(cx,cy,55*s,0,Math.PI*2);ctx.strokeStyle='rgba(0,229,255,.12)';ctx.lineWidth=1;ctx.setLineDash([4,8]);ctx.stroke();ctx.setLineDash([]);
+  const eg=ctx.createRadialGradient(cx,cy,0,cx,cy,18*s);eg.addColorStop(0,'#4da6ff');eg.addColorStop(1,'#102040');
+  ctx.beginPath();ctx.arc(cx,cy,18*s,0,Math.PI*2);ctx.fillStyle=eg;ctx.fill();
+  orbs.forEach(o=>{
+    o.angle+=o.speed;
+    const ax=cx+Math.cos(o.angle)*o.r*s,ay=cy+Math.sin(o.angle)*o.r*s*0.6;
+    const g=ctx.createRadialGradient(ax,ay,0,ax,ay,o.sz*2.5);
+    g.addColorStop(0,o.color+'80');g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(ax,ay,o.sz*2.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ax,ay,Math.max(o.sz,2),0,Math.PI*2);ctx.fillStyle=o.color;ctx.fill();
+  });
+  requestAnimationFrame(draw);
+}
+draw();
+
+// PHA chart
+new Chart(document.getElementById('phaChart'),{
+  type:'doughnut',
+  data:{labels:['SAFE','HAZARDOUS (PHA)'],datasets:[{data:[totalObjects-phaCount,phaCount],backgroundColor:['rgba(0,255,136,.6)','rgba(255,43,85,.6)'],borderColor:['#00ff88','#ff2b55'],borderWidth:1.5}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'60%',animation:{duration:1400},plugins:{legend:{labels:{color:'rgba(200,220,240,.6)',font:{family:"'Share Tech Mono'",size:8},boxWidth:10,padding:8}},tooltip:{backgroundColor:'rgba(4,18,35,.95)',borderColor:'#00e5ff',borderWidth:1,titleColor:'#00e5ff',bodyColor:'rgba(200,220,240,.8)',titleFont:{family:"'Share Tech Mono'"},bodyFont:{family:"'Share Tech Mono'",size:10}}}}
+});
+
+// Orbit chart
+new Chart(document.getElementById('orbitChart'),{
+  type:'bar',
+  data:{labels:['APOLLO','ATEN','AMOR','OTHER'],datasets:[{data:[8,4,3,1],backgroundColor:['rgba(0,229,255,.5)','rgba(176,96,255,.5)','rgba(255,192,64,.5)','rgba(255,107,43,.5)'],borderColor:['#00e5ff','#b060ff','#ffc040','#ff6b2b'],borderWidth:1}]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:1200},plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(4,18,35,.95)',borderColor:'#00e5ff',borderWidth:1,titleColor:'#00e5ff',bodyColor:'rgba(200,220,240,.8)',titleFont:{family:"'Share Tech Mono'"},bodyFont:{family:"'Share Tech Mono'",size:10}}},scales:{x:{ticks:{color:'rgba(100,140,160,.7)',font:{family:"'Share Tech Mono'",size:8}},grid:{color:'rgba(0,229,255,.06)'},border:{color:'rgba(0,229,255,.2)'}},y:{ticks:{color:'rgba(100,140,160,.7)',font:{family:"'Share Tech Mono'",size:8}},grid:{color:'rgba(0,229,255,.06)'},border:{color:'rgba(0,229,255,.2)'}}}}
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artemis — Deep Space Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="ArtemisNexus-style.css">
+  <script src="ArtemisAPI.js"></script>
+  <style>
+    :root {
+      --bg-deep: #030108;
+      --bg-panel: rgba(8, 3, 18, 0.95);
+      --bg-card: rgba(12, 4, 25, 0.9);
+      --purple: #b060ff;
+      --purple-dim: rgba(176, 96, 255, 0.12);
+      --purple-glow: rgba(176, 96, 255, 0.4);
+      --gold: #ffd060;
+      --gold-dim: rgba(255, 208, 96, 0.12);
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0, 229, 255, 0.1);
+      --orange: #ff8040;
+      --green: #00ff88;
+      --red: #ff3060;
+      --text-primary: #e8d8ff;
+      --text-secondary: #8060b0;
+      --text-dim: #3a205a;
+      --border: rgba(176, 96, 255, 0.15);
+      --border-bright: rgba(176, 96, 255, 0.4);
+      --font-display: 'Orbitron', monospace;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-body: 'Exo 2', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* Deep space background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 30%, rgba(80, 0, 180, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(100, 0, 80, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(50, 0, 100, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(176, 96, 255, 0.012) 2px, rgba(176, 96, 255, 0.012) 4px);
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(4, 1, 10, 0.97);
+      border-bottom: 1px solid var(--border-bright);
+      box-shadow: 0 0 30px rgba(176, 96, 255, 0.1);
+    }
+
+    .logo-area { display: flex; align-items: center; gap: 16px; }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border: 2px solid var(--purple);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--purple-glow), inset 0 0 15px var(--purple-dim);
+      animation: pulse-ring 3s ease-in-out infinite;
+    }
+
+    .logo-icon::before {
+      content: '';
+      width: 0;
+      height: 0;
+      background: transparent;
+    }
+
+    /* Black hole mini icon */
+    .logo-icon::after {
+      content: '';
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #000 50%, #ff8040 100%);
+      box-shadow: 0 0 12px var(--purple);
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 15px var(--purple-glow), inset 0 0 15px var(--purple-dim); }
+      50% { box-shadow: 0 0 30px var(--purple-glow), inset 0 0 25px var(--purple-dim); }
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--purple);
+      text-shadow: 0 0 20px var(--purple-glow);
+    }
+
+    .logo-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 3px;
+      margin-top: 2px;
+    }
+
+    .nav-links { display: flex; gap: 4px; }
+
+    .nav-link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 8px 18px;
+      border: 1px solid transparent;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      position: relative;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--purple);
+      border-color: var(--border);
+      background: var(--purple-dim);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--purple);
+      box-shadow: 0 0 8px var(--purple);
+    }
+
+    .header-status { display: flex; align-items: center; gap: 20px; }
+
+    .status-item {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .status-item span { color: var(--purple); display: block; font-size: 11px; }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 2px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--gold);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--gold);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 0;
+      height: calc(100vh - 70px);
+      position: relative;
+      z-index: 5;
+    }
+
+    /* ===== LEFT — VISUALIZATION + TABLE ===== */
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Black Hole Visualizer */
+    .bh-visualizer {
+      position: relative;
+      height: 320px;
+      background: #000;
+      overflow: hidden;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    canvas#bhCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .bh-hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .bh-hud::before, .bh-hud::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-color: var(--purple);
+      border-style: solid;
+      opacity: 0.5;
+    }
+
+    .bh-hud::before { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+    .bh-hud::after { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+
+    .bh-label {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-display);
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: var(--purple);
+      opacity: 0.7;
+    }
+
+    .bh-data {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: rgba(176, 96, 255, 0.5);
+      line-height: 1.8;
+    }
+
+    .bh-stats {
+      position: absolute;
+      bottom: 14px;
+      right: 16px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: rgba(176, 96, 255, 0.5);
+      text-align: right;
+      line-height: 1.8;
+    }
+
+    /* Selected BH info overlay */
+    .bh-info-overlay {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--border);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      line-height: 1.8;
+      min-width: 170px;
+      backdrop-filter: blur(4px);
+    }
+
+    .bh-info-name {
+      font-family: var(--font-display);
+      font-size: 10px;
+      color: var(--gold);
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+      text-shadow: 0 0 8px rgba(255,208,96,0.5);
+    }
+
+    .bh-info-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .bh-info-label { color: var(--text-dim); }
+    .bh-info-val { color: var(--text-secondary); }
+
+    /* ===== DATA TABLE ===== */
+    .data-section {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+      min-height: 0;
+    }
+
+    .data-section::-webkit-scrollbar { width: 3px; }
+    .data-section::-webkit-scrollbar-thumb { background: var(--purple-dim); }
+
+    .table-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4, 1, 10, 0.8);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .table-header-bar h3 {
+      font-family: var(--font-display);
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--purple);
+      opacity: 0.8;
+    }
+
+    .filter-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    .filter-btn {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 1px;
+      padding: 3px 10px;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.3s;
+      background: transparent;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      background: var(--purple-dim);
+      color: var(--purple);
+      border-color: rgba(176,96,255,0.4);
+    }
+
+    /* Big discovery table */
+    .discovery-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .discovery-table thead th {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      padding: 8px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4, 1, 10, 0.6);
+      position: sticky;
+      top: 44px;
+    }
+
+    .discovery-table tbody tr {
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 1px solid rgba(176, 96, 255, 0.05);
+    }
+
+    .discovery-table tbody tr:hover {
+      background: var(--purple-dim);
+    }
+
+    .discovery-table tbody tr.selected {
+      background: rgba(176, 96, 255, 0.1);
+      border-left: 3px solid var(--purple);
+    }
+
+    .discovery-table tbody td {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 10px 16px;
+      color: var(--text-secondary);
+    }
+
+    .discovery-table tbody td.name-col {
+      color: var(--text-primary);
+      font-weight: 400;
+      letter-spacing: 1px;
+    }
+
+    .discovery-table tbody td.dist-col {
+      color: var(--gold);
+    }
+
+    .discovery-table tbody td.mass-col {
+      color: var(--purple);
+    }
+
+    .discovery-table tbody td.year-col {
+      color: var(--cyan);
+    }
+
+    .type-badge {
+      font-family: var(--font-mono);
+      font-size: 7px;
+      padding: 2px 6px;
+      border-radius: 2px;
+      letter-spacing: 1px;
+    }
+
+    .type-stellar { background: rgba(0,229,255,0.1); color: var(--cyan); border: 1px solid rgba(0,229,255,0.25); }
+    .type-super { background: rgba(255,208,96,0.1); color: var(--gold); border: 1px solid rgba(255,208,96,0.25); }
+    .type-intermediate { background: rgba(0,255,136,0.1); color: var(--green); border: 1px solid rgba(0,255,136,0.25); }
+    .type-primordial { background: rgba(176,96,255,0.15); color: var(--purple); border: 1px solid rgba(176,96,255,0.3); }
+
+    /* ===== RIGHT COL ===== */
+    .right-col {
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .right-col-inner {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .right-col-inner::-webkit-scrollbar { width: 3px; }
+    .right-col-inner::-webkit-scrollbar-thumb { background: var(--purple-dim); }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 8px;
+      letter-spacing: 3px;
+      color: var(--purple);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+      opacity: 0.8;
+    }
+
+    /* Detail card */
+    .detail-card {
+      background: rgba(12,4,25,0.7);
+      border: 1px solid var(--border);
+      padding: 14px;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .detail-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--purple), transparent);
+    }
+
+    .detail-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gold);
+      text-shadow: 0 0 10px rgba(255,208,96,0.4);
+      margin-bottom: 4px;
+      letter-spacing: 2px;
+    }
+
+    .detail-subtitle {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-secondary);
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(176,96,255,0.06);
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .detail-label { color: var(--text-dim); letter-spacing: 1px; }
+    .detail-val { color: var(--text-secondary); }
+    .detail-val.highlight { color: var(--gold); }
+    .detail-val.cyan { color: var(--cyan); }
+    .detail-val.purple { color: var(--purple); }
+    .detail-val.green { color: var(--green); }
+
+    /* Chart panels */
+    .chart-panel {
+      background: rgba(12,4,25,0.6);
+      border: 1px solid var(--border);
+      padding: 12px;
+      position: relative;
+    }
+
+    .chart-panel::before, .chart-panel::after {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-color: var(--purple);
+      border-style: solid;
+      opacity: 0.4;
+    }
+
+    .chart-panel::before { top: 4px; left: 4px; border-width: 1px 0 0 1px; }
+    .chart-panel::after { bottom: 4px; right: 4px; border-width: 0 1px 1px 0; }
+
+    .chart-title {
+      font-family: var(--font-display);
+      font-size: 7px;
+      letter-spacing: 2px;
+      color: var(--purple);
+      margin-bottom: 8px;
+      opacity: 0.7;
+    }
+
+    .chart-wrap {
+      height: 100px;
+      position: relative;
+    }
+
+    /* Telescope list */
+    .scope-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(176,96,255,0.06);
+    }
+
+    .scope-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .scope-info { flex: 1; }
+
+    .scope-name {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+    }
+
+    .scope-detail {
+      font-size: 8px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      margin-top: 1px;
+    }
+
+    .scope-count {
+      font-family: var(--font-display);
+      font-size: 11px;
+      color: var(--purple);
+    }
+
+    /* Quick facts */
+    .fact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .fact-cell {
+      background: rgba(20,8,40,0.6);
+      border: 1px solid var(--border);
+      padding: 10px;
+      text-align: center;
+    }
+
+    .fact-val {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--purple);
+      text-shadow: 0 0 10px var(--purple-glow);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .fact-val.gold { color: var(--gold); text-shadow: 0 0 10px rgba(255,208,96,0.4); }
+    .fact-val.cyan { color: var(--cyan); text-shadow: 0 0 10px rgba(0,229,255,0.4); }
+    .fact-val.orange { color: var(--orange); text-shadow: 0 0 10px rgba(255,128,64,0.4); }
+
+    .fact-label {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .anim { animation: fadeIn 0.5s ease forwards; opacity: 0; }
+    .anim:nth-child(1) { animation-delay: 0.1s; }
+    .anim:nth-child(2) { animation-delay: 0.2s; }
+    .anim:nth-child(3) { animation-delay: 0.35s; }
+    .anim:nth-child(4) { animation-delay: 0.5s; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo-area">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text">NEXUS</div>
+      <div class="logo-sub">DEEP SPACE EXPLORER</div>
+    </div>
+  </div>
+
+  <div id="navMount"></div>
+
+  <div class="header-status">
+    <div class="status-item">CATALOG <span>21 BLACK HOLES</span></div>
+    <div class="status-item">JWST STATUS <span>ACTIVE</span></div>
+    <div class="live-indicator"><div class="live-dot"></div> EHT FEED</div>
+  </div>
+</header>
+
+<div class="main-layout">
+
+  <!-- LEFT COLUMN -->
+  <div class="left-col">
+
+    <!-- Black Hole Visualizer -->
+    <div class="bh-visualizer">
+      <canvas id="bhCanvas"></canvas>
+      <div class="bh-hud"></div>
+      <div class="bh-label">GRAVITATIONAL LENSING — REAL-TIME RENDER</div>
+
+      <div class="bh-info-overlay" id="bhInfoOverlay">
+        <div class="bh-info-name" id="selectedName">SAGITTARIUS A*</div>
+        <div class="bh-info-row"><span class="bh-info-label">TYPE</span><span class="bh-info-val">SUPERMASSIVE</span></div>
+        <div class="bh-info-row"><span class="bh-info-label">MASS</span><span class="bh-info-val">4M M☉</span></div>
+        <div class="bh-info-row"><span class="bh-info-label">DISTANCE</span><span class="bh-info-val" id="selectedDist">26,000 LY</span></div>
+        <div class="bh-info-row"><span class="bh-info-label">DISCOVERED</span><span class="bh-info-val" id="selectedYear">1974</span></div>
+        <div class="bh-info-row"><span class="bh-info-label">TELESCOPE</span><span class="bh-info-val" id="selectedScope">EHT / VLA</span></div>
+        <div class="bh-info-row"><span class="bh-info-label">STATUS</span><span class="bh-info-val" style="color:var(--green);">CONFIRMED</span></div>
+      </div>
+
+      <div class="bh-data">
+        <div>SCHWARZSCHILD RADIUS: 11.8M KM</div>
+        <div>EVENT HORIZON: ACTIVE</div>
+        <div>HAWKING RADIATION: THEORETICAL</div>
+      </div>
+
+      <div class="bh-stats">
+        <div>RENDER: REAL-TIME</div>
+        <div>ACCRETION: SIMULATED</div>
+        <div id="bhFrameRate">FPS: --</div>
+      </div>
+    </div>
+
+    <!-- Discovery Table -->
+    <div class="data-section">
+      <div class="table-header-bar">
+        <h3>● BLACK HOLE & DEEP SPACE CATALOG</h3>
+        <div class="filter-btns">
+          <button class="filter-btn active" onclick="filterTable('all', this)">ALL</button>
+          <button class="filter-btn" onclick="filterTable('supermassive', this)">SUPERMASSIVE</button>
+          <button class="filter-btn" onclick="filterTable('stellar', this)">STELLAR</button>
+          <button class="filter-btn" onclick="filterTable('other', this)">OTHER</button>
+        </div>
+      </div>
+
+      <table class="discovery-table" id="discoveryTable">
+        <thead>
+        <tr>
+          <th>OBJECT NAME</th>
+          <th>TYPE</th>
+          <th>DISTANCE</th>
+          <th>MASS (M☉)</th>
+          <th>DISC. YEAR</th>
+          <th>TELESCOPE</th>
+          <th>STATUS</th>
+        </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="right-col">
+    <div class="right-col-inner">
+
+      <div class="section-title">● SELECTED OBJECT DETAILS</div>
+
+      <div class="detail-card anim" id="detailCard">
+        <div class="detail-title" id="detailName">SAGITTARIUS A*</div>
+        <div class="detail-subtitle">MILKY WAY GALACTIC CENTER</div>
+        <div class="detail-row"><span class="detail-label">CATEGORY</span><span class="detail-val highlight">SUPERMASSIVE</span></div>
+        <div class="detail-row"><span class="detail-label">MASS</span><span class="detail-val purple" id="dMass">~4 million M☉</span></div>
+        <div class="detail-row"><span class="detail-label">DISTANCE</span><span class="detail-val cyan" id="dDist">26,000 light years</span></div>
+        <div class="detail-row"><span class="detail-label">SCHWARZ. RADIUS</span><span class="detail-val" id="dRadius">11.8 million km</span></div>
+        <div class="detail-row"><span class="detail-label">DISCOVERED</span><span class="detail-val" id="dYear">1974</span></div>
+        <div class="detail-row"><span class="detail-label">TELESCOPE</span><span class="detail-val" id="dScope">EHT, VLA, Chandra</span></div>
+        <div class="detail-row"><span class="detail-label">HOST GALAXY</span><span class="detail-val" id="dGalaxy">Milky Way</span></div>
+        <div class="detail-row"><span class="detail-label">IMAGE CAPTURED</span><span class="detail-val green" id="dImage">YES — 2022 EHT</span></div>
+      </div>
+
+      <div class="section-title">● CATALOG OVERVIEW</div>
+
+      <div class="fact-grid anim">
+        <div class="fact-cell">
+          <div class="fact-val">21</div>
+          <div class="fact-label">TOTAL OBJECTS</div>
+        </div>
+        <div class="fact-cell">
+          <div class="fact-val gold">8</div>
+          <div class="fact-label">SUPERMASSIVE</div>
+        </div>
+        <div class="fact-cell">
+          <div class="fact-val cyan">10</div>
+          <div class="fact-label">STELLAR MASS</div>
+        </div>
+        <div class="fact-cell">
+          <div class="fact-val orange">3</div>
+          <div class="fact-label">INTERMEDIATE</div>
+        </div>
+      </div>
+
+      <div class="section-title">● MASS DISTRIBUTION</div>
+
+      <div class="chart-panel anim">
+        <div class="chart-title">▸ MASS COMPARISON (LOG SCALE, M☉)</div>
+        <div class="chart-wrap">
+          <canvas id="massChart"></canvas>
+        </div>
+      </div>
+
+      <div class="section-title">● DISCOVERY TIMELINE</div>
+
+      <div class="chart-panel anim">
+        <div class="chart-title">▸ DISCOVERIES BY DECADE</div>
+        <div class="chart-wrap">
+          <canvas id="timelineChart"></canvas>
+        </div>
+      </div>
+
+      <div class="section-title">● TELESCOPES USED</div>
+
+      <div>
+        <div class="scope-item">
+          <div class="scope-dot" style="background:#b060ff; box-shadow:0 0 6px #b060ff;"></div>
+          <div class="scope-info">
+            <div class="scope-name">EVENT HORIZON TELESCOPE</div>
+            <div class="scope-detail">FIRST BLACK HOLE IMAGE · 2019</div>
+          </div>
+          <div class="scope-count">4</div>
+        </div>
+        <div class="scope-item">
+          <div class="scope-dot" style="background:#00e5ff; box-shadow:0 0 6px #00e5ff;"></div>
+          <div class="scope-info">
+            <div class="scope-name">JAMES WEBB ST</div>
+            <div class="scope-detail">INFRARED DEEP FIELD · 2022+</div>
+          </div>
+          <div class="scope-count">6</div>
+        </div>
+        <div class="scope-item">
+          <div class="scope-dot" style="background:#ffd060; box-shadow:0 0 6px #ffd060;"></div>
+          <div class="scope-info">
+            <div class="scope-name">CHANDRA X-RAY OBS.</div>
+            <div class="scope-detail">X-RAY IMAGING · 1999+</div>
+          </div>
+          <div class="scope-count">7</div>
+        </div>
+        <div class="scope-item">
+          <div class="scope-dot" style="background:#00ff88; box-shadow:0 0 6px #00ff88;"></div>
+          <div class="scope-info">
+            <div class="scope-name">LIGO GRAVITATIONAL WAVE</div>
+            <div class="scope-detail">MERGER DETECTION · 2015+</div>
+          </div>
+          <div class="scope-count">4</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== CATALOG DATA =====
+  const catalog = [
+    { name: 'Sagittarius A*',      type: 'supermassive',  dist: '26,000 LY',       mass: '~4M',       year: 1974, scope: 'EHT / VLA',     galaxy: 'Milky Way',    radius: '11.8M km', image: 'YES — 2022 EHT',   status: 'CONFIRMED' },
+    { name: 'M87*',                type: 'supermassive',  dist: '55M LY',          mass: '~6.5B',     year: 1918, scope: 'EHT',            galaxy: 'M87',          radius: '19.4B km', image: 'YES — 2019 EHT',   status: 'CONFIRMED' },
+    { name: 'NGC 4889',            type: 'supermassive',  dist: '308M LY',         mass: '~21B',      year: 1785, scope: 'HST / Gemini',   galaxy: 'NGC 4889',     radius: '64B km',   image: 'PARTIAL',          status: 'CONFIRMED' },
+    { name: 'TON 618',             type: 'supermassive',  dist: '10.4B LY',        mass: '~66B',      year: 1957, scope: 'Sloan DSS',      galaxy: 'TON 618',      radius: '194B km',  image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'Holm 15A*',           type: 'supermassive',  dist: '700M LY',         mass: '~40B',      year: 2019, scope: 'VLT / HST',      galaxy: 'Holm 15A',     radius: '120B km',  image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'NGC 1277',            type: 'supermassive',  dist: '220M LY',         mass: '~17B',      year: 2012, scope: 'Hobby-Eberly',   galaxy: 'NGC 1277',     radius: '50B km',   image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'Phoenix A',           type: 'supermassive',  dist: '5.8B LY',         mass: '~100B',     year: 2012, scope: 'Chandra',        galaxy: 'Phoenix A',    radius: '295B km',  image: 'INDIRECT',         status: 'ESTIMATED' },
+    { name: 'Cygnus X-1',         type: 'stellar',       dist: '6,070 LY',        mass: '~21',       year: 1964, scope: 'X-ray Sat.',     galaxy: 'Milky Way',    radius: '62 km',    image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'V404 Cygni',         type: 'stellar',       dist: '7,800 LY',        mass: '~9',        year: 1989, scope: 'Ginga / RXTE',   galaxy: 'Milky Way',    radius: '27 km',    image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'GRO J1655-40',       type: 'stellar',       dist: '11,000 LY',       mass: '~6.3',      year: 1994, scope: 'CGRO',           galaxy: 'Milky Way',    radius: '18.5 km',  image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'A0620-00',            type: 'stellar',       dist: '3,300 LY',        mass: '~6.6',      year: 1975, scope: 'Ariel V',        galaxy: 'Milky Way',    radius: '19.5 km',  image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'XTE J1650-500',      type: 'stellar',       dist: '8,500 LY',        mass: '~4',        year: 2001, scope: 'RXTE',           galaxy: 'Milky Way',    radius: '12 km',    image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'GW150914',            type: 'stellar',       dist: '1.3B LY',         mass: '~62 (merger)', year: 2015, scope: 'LIGO',      galaxy: 'Unknown',      radius: '~180 km',  image: 'WAVE DETECTED',    status: 'CONFIRMED' },
+    { name: 'GW170814',            type: 'stellar',       dist: '1.8B LY',         mass: '~53 (merger)', year: 2017, scope: 'LIGO/Virgo', galaxy: 'Unknown',     radius: '~155 km',  image: 'WAVE DETECTED',    status: 'CONFIRMED' },
+    { name: 'GW190521',            type: 'intermediate',  dist: '17B LY',          mass: '~142',      year: 2019, scope: 'LIGO/Virgo',    galaxy: 'Unknown',      radius: '~420 km',  image: 'WAVE DETECTED',    status: 'CONFIRMED' },
+    { name: 'NGC 1313 X-1',       type: 'intermediate',  dist: '14M LY',          mass: '~5,000',    year: 2006, scope: 'XMM-Newton',     galaxy: 'NGC 1313',     radius: '15,000 km', image: 'X-RAY',           status: 'CANDIDATE' },
+    { name: 'HLX-1',              type: 'intermediate',  dist: '290M LY',         mass: '~20,000',   year: 2009, scope: 'XMM-Newton',     galaxy: 'ESO 243-49',   radius: '59,000 km', image: 'X-RAY',           status: 'CANDIDATE' },
+    { name: 'OJ 287',             type: 'supermassive',  dist: '3.5B LY',         mass: '~18B',      year: 1891, scope: 'Various',        galaxy: 'OJ 287',       radius: '53B km',   image: 'INDIRECT',         status: 'CONFIRMED' },
+    { name: 'NGC 3115',           type: 'supermassive',  dist: '32M LY',          mass: '~2B',       year: 1787, scope: 'Chandra/HST',    galaxy: 'NGC 3115',     radius: '6B km',    image: 'X-RAY',            status: 'CONFIRMED' },
+    { name: 'Markarian 501',      type: 'supermassive',  dist: '460M LY',         mass: '~1B',       year: 1975, scope: 'Fermi/VERITAS',  galaxy: 'Mrk 501',      radius: '3B km',    image: 'BLAZAR JET',       status: 'CONFIRMED' },
+    { name: '3C 273',             type: 'supermassive',  dist: '2.4B LY',         mass: '~900M',     year: 1959, scope: 'Various',        galaxy: '3C 273',       radius: '2.7B km',  image: 'JET IMAGED',       status: 'CONFIRMED' },
+  ];
+
+  let currentFilter = 'all';
+  let selectedRow = null;
+
+  function getTypeBadge(type) {
+    const map = {
+      supermassive: '<span class="type-badge type-super">SUPERMASSIVE</span>',
+      stellar: '<span class="type-badge type-stellar">STELLAR</span>',
+      intermediate: '<span class="type-badge type-intermediate">INTERMEDIATE</span>',
+      primordial: '<span class="type-badge type-primordial">PRIMORDIAL</span>',
+      other: '<span class="type-badge type-stellar">OTHER</span>',
+    };
+    return map[type] || type;
+  }
+
+  function getStatusColor(status) {
+    if (status === 'CONFIRMED') return 'color:var(--green)';
+    if (status === 'CANDIDATE') return 'color:var(--gold)';
+    if (status === 'ESTIMATED') return 'color:var(--orange)';
+    return '';
+  }
+
+  function renderTable(filter) {
+    const tbody = document.getElementById('tableBody');
+    const filtered = filter === 'all' ? catalog :
+      filter === 'other' ? catalog.filter(d => d.type === 'intermediate') :
+      catalog.filter(d => d.type === filter);
+
+    tbody.innerHTML = filtered.map((item, i) => `
+      <tr onclick="selectItem(${catalog.indexOf(item)})" class="${selectedRow === catalog.indexOf(item) ? 'selected' : ''}">
+        <td class="name-col">${item.name}</td>
+        <td>${getTypeBadge(item.type)}</td>
+        <td class="dist-col">${item.dist}</td>
+        <td class="mass-col">${item.mass}</td>
+        <td class="year-col">${item.year}</td>
+        <td>${item.scope}</td>
+        <td style="${getStatusColor(item.status)}">${item.status}</td>
+      </tr>
+    `).join('');
+  }
+
+  function filterTable(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable(f);
+  }
+
+  function selectItem(idx) {
+    selectedRow = idx;
+    const item = catalog[idx];
+    renderTable(currentFilter);
+
+    // Update detail card
+    document.getElementById('detailName').textContent = item.name;
+    document.getElementById('dMass').textContent = item.mass + ' M☉';
+    document.getElementById('dDist').textContent = item.dist;
+    document.getElementById('dRadius').textContent = item.radius;
+    document.getElementById('dYear').textContent = item.year;
+    document.getElementById('dScope').textContent = item.scope;
+    document.getElementById('dGalaxy').textContent = item.galaxy;
+    document.getElementById('dImage').textContent = item.image;
+
+    // Update BH overlay
+    document.getElementById('selectedName').textContent = item.name.toUpperCase();
+    document.getElementById('selectedDist').textContent = item.dist;
+    document.getElementById('selectedYear').textContent = item.year;
+    document.getElementById('selectedScope').textContent = item.scope;
+
+    // Update BH visual color based on type
+    bhColor = item.type === 'supermassive' ? '#ff8040' :
+              item.type === 'stellar' ? '#00e5ff' :
+              item.type === 'intermediate' ? '#00ff88' : '#b060ff';
+  }
+
+  renderTable('all');
+
+  // ===== BLACK HOLE CANVAS =====
+  const bhCanvas = document.getElementById('bhCanvas');
+  const bhCtx = bhCanvas.getContext('2d');
+  let bhColor = '#ff8040';
+  let bhTime = 0;
+  let bhFPS = 0, bhLastTime = 0;
+
+  function resizeBHCanvas() {
+    bhCanvas.width = bhCanvas.parentElement.offsetWidth;
+    bhCanvas.height = bhCanvas.parentElement.offsetHeight;
+  }
+  resizeBHCanvas();
+  window.addEventListener('resize', resizeBHCanvas);
+
+  function drawBlackHole(timestamp) {
+    const dt = timestamp - bhLastTime;
+    bhFPS = Math.round(1000 / dt);
+    bhLastTime = timestamp;
+    document.getElementById('bhFrameRate').textContent = 'FPS: ' + bhFPS;
+
+    const w = bhCanvas.width;
+    const h = bhCanvas.height;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    bhTime += 0.008;
+
+    // Clear
+    bhCtx.fillStyle = 'rgba(0,0,0,0.15)';
+    bhCtx.fillRect(0, 0, w, h);
+
+    // Accretion disk particles
+    for (let i = 0; i < 3; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = 100 + Math.random() * 80;
+      const x = cx + Math.cos(angle + bhTime) * r * (w / 800);
+      const y = cy + Math.sin(angle + bhTime) * r * 0.35 * (h / 350);
+      const size = Math.random() * 2.5;
+      const alpha = Math.random() * 0.6;
+
+      // Color gradient from orange to yellow to white
+      const hue = Math.random() > 0.5 ? bhColor : '#ffd060';
+      bhCtx.beginPath();
+      bhCtx.arc(x, y, size, 0, Math.PI * 2);
+      bhCtx.fillStyle = hue.replace(')', `, ${alpha})`).replace('rgb', 'rgba').replace('#', 'rgba(').replace(',','').replace('ff','255,').slice(0,-1) + ')';
+      bhCtx.fillStyle = `${hue}${Math.round(alpha * 255).toString(16).padStart(2,'0')}`;
+      bhCtx.fill();
+    }
+
+    // Draw accretion ring
+    for (let ring = 0; ring < 3; ring++) {
+      const rx = (100 + ring * 20) * (w / 800);
+      const ry = (35 + ring * 7) * (h / 350);
+      const alpha = 0.7 - ring * 0.2;
+
+      bhCtx.beginPath();
+      bhCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      bhCtx.strokeStyle = ring === 0 ? `${bhColor}${Math.round(alpha * 255).toString(16).padStart(2,'0')}` : `rgba(255,160,50,${alpha * 0.4})`;
+      bhCtx.lineWidth = ring === 0 ? 2 : 1;
+      bhCtx.stroke();
+    }
+
+    // Gravitational lensing effect (light ring)
+    const lgGrad = bhCtx.createRadialGradient(cx, cy, 60 * (w/800), cx, cy, 140 * (w/800));
+    lgGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    lgGrad.addColorStop(0.5, `rgba(255,180,80,0.12)`);
+    lgGrad.addColorStop(0.7, `rgba(255,100,20,0.08)`);
+    lgGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    bhCtx.fillStyle = lgGrad;
+    bhCtx.beginPath();
+    bhCtx.arc(cx, cy, 140 * (w/800), 0, Math.PI * 2);
+    bhCtx.fill();
+
+    // Outer glow
+    const outerGlow = bhCtx.createRadialGradient(cx, cy, 0, cx, cy, 200 * (w/800));
+    outerGlow.addColorStop(0, 'rgba(0,0,0,0)');
+    outerGlow.addColorStop(0.4, 'rgba(0,0,0,0)');
+    outerGlow.addColorStop(0.65, `rgba(80,30,0,0.2)`);
+    outerGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    bhCtx.fillStyle = outerGlow;
+    bhCtx.beginPath();
+    bhCtx.arc(cx, cy, 200 * (w/800), 0, Math.PI * 2);
+    bhCtx.fill();
+
+    // Event horizon (black hole itself)
+    const eventGrad = bhCtx.createRadialGradient(cx, cy, 0, cx, cy, 80 * (w/800));
+    eventGrad.addColorStop(0, '#000000');
+    eventGrad.addColorStop(0.8, '#000000');
+    eventGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    bhCtx.fillStyle = eventGrad;
+    bhCtx.beginPath();
+    bhCtx.arc(cx, cy, 80 * (w/800), 0, Math.PI * 2);
+    bhCtx.fill();
+
+    // Photon sphere glow
+    bhCtx.beginPath();
+    bhCtx.arc(cx, cy, 82 * (w/800), 0, Math.PI * 2);
+    bhCtx.strokeStyle = `rgba(255,220,100,0.25)`;
+    bhCtx.lineWidth = 2;
+    bhCtx.stroke();
+
+    // Jet streams
+    for (let side = -1; side <= 1; side += 2) {
+      bhCtx.beginPath();
+      bhCtx.moveTo(cx, cy);
+      bhCtx.lineTo(cx + side * 30 * (w/800), cy - 200 * (h/320));
+      const jetGrad = bhCtx.createLinearGradient(cx, cy, cx, cy - 180 * (h/320));
+      jetGrad.addColorStop(0, `rgba(130,50,255,0.6)`);
+      jetGrad.addColorStop(0.5, `rgba(80,30,200,0.3)`);
+      jetGrad.addColorStop(1, `rgba(50,10,150,0)`);
+      bhCtx.strokeStyle = jetGrad;
+      bhCtx.lineWidth = 6 * (w/800);
+      bhCtx.stroke();
+
+      bhCtx.beginPath();
+      bhCtx.moveTo(cx, cy);
+      bhCtx.lineTo(cx + side * 20 * (w/800), cy + 200 * (h/320));
+      const jetGrad2 = bhCtx.createLinearGradient(cx, cy, cx, cy + 180 * (h/320));
+      jetGrad2.addColorStop(0, `rgba(130,50,255,0.4)`);
+      jetGrad2.addColorStop(1, `rgba(50,10,150,0)`);
+      bhCtx.strokeStyle = jetGrad2;
+      bhCtx.lineWidth = 4 * (w/800);
+      bhCtx.stroke();
+    }
+
+    // Scan line
+    const scanY = ((bhTime * 30) % h);
+    bhCtx.beginPath();
+    bhCtx.moveTo(0, scanY);
+    bhCtx.lineTo(w, scanY);
+    bhCtx.strokeStyle = 'rgba(176,96,255,0.06)';
+    bhCtx.lineWidth = 1;
+    bhCtx.stroke();
+
+    requestAnimationFrame(drawBlackHole);
+  }
+  requestAnimationFrame(drawBlackHole);
+
+  // ===== MASS COMPARISON CHART =====
+  new Chart(document.getElementById('massChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: ['Sag A*', 'M87*', 'OJ 287', 'NGC 4889', 'TON 618'],
+      datasets: [{
+        data: [4, 6500, 18000, 21000, 66000],
+        backgroundColor: ['rgba(0,229,255,0.6)', 'rgba(176,96,255,0.6)', 'rgba(255,208,96,0.6)', 'rgba(255,128,64,0.6)', 'rgba(255,48,96,0.6)'],
+        borderColor: ['#00e5ff','#b060ff','#ffd060','#ff8040','#ff3060'],
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      animation: { duration: 1500 },
+      scales: {
+        x: { ticks: { color: '#3a205a', font: { family: "'Share Tech Mono'", size: 7 } }, grid: { color: 'rgba(176,96,255,0.06)' }, border: { color: 'rgba(176,96,255,0.15)' } },
+        y: {
+          type: 'logarithmic',
+          ticks: { color: '#3a205a', font: { family: "'Share Tech Mono'", size: 7 } },
+          grid: { color: 'rgba(176,96,255,0.06)' },
+          border: { color: 'rgba(176,96,255,0.15)' },
+        }
+      }
+    }
+  });
+
+  // ===== TIMELINE CHART =====
+  new Chart(document.getElementById('timelineChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: ['1950s', '1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'],
+      datasets: [{
+        data: [1, 2, 2, 1, 3, 3, 6, 3],
+        backgroundColor: 'rgba(176,96,255,0.3)',
+        borderColor: '#b060ff',
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      animation: { duration: 1200 },
+      scales: {
+        x: { ticks: { color: '#3a205a', font: { family: "'Share Tech Mono'", size: 7 } }, grid: { color: 'rgba(176,96,255,0.06)' }, border: { color: 'rgba(176,96,255,0.15)' } },
+        y: { ticks: { color: '#3a205a', font: { family: "'Share Tech Mono'", size: 7 } }, grid: { color: 'rgba(176,96,255,0.06)' }, border: { color: 'rgba(176,96,255,0.15)' } }
+      }
+    }
+  });
+</script>
+<script>
+  if (typeof ArtemisNexus !== 'undefined' && document.getElementById('navMount')) {
+    document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('blackhole');
+  }
+</script>
+</body>
+</html>

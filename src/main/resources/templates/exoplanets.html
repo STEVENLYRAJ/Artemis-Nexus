@@ -1,0 +1,676 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArtemisNexus — Exoplanets</title>
+<link rel="stylesheet" href="ArtemisNexus-style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ArtemisAPI.js"></script>
+<style>
+.layout{display:grid;grid-template-columns:250px 1fr;height:calc(100vh - 70px);position:relative;z-index:5;}
+.left-col{background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.center-col{display:flex;flex-direction:column;overflow:hidden;}
+.controls-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.table-wrap{flex:1;overflow-y:auto;}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5;}
+
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(2,8,20,.95);}
+.stats-strip .nxs-stat-big{border-right:1px solid var(--border);padding:12px 6px;}
+
+.planet-card{padding:14px;border-bottom:1px solid rgba(0,229,255,0.08);transition:all .2s;cursor:pointer;}
+.planet-card:hover{background:rgba(0,229,255,0.05);}
+.planet-name{font-family:var(--font-display);font-size:13px;color:var(--cyan);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}
+.planet-meta{font-family:var(--font-mono);font-size:9px;color:var(--text-dim);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<header class="nxs-header">
+  <div class="nxs-logo"><div class="nxs-logo-icon"></div>
+    <div><div class="nxs-logo-text">ArtemisNexus</div><div class="nxs-logo-sub">DEEP SPACE HABITABILITY</div></div>
+  </div>
+  <div id="navMount"></div>
+  <div class="nxs-hdr-right">
+    <div class="nxs-stat">API SOURCE<span id="apiSource">LIVE NASA EXOPLANET ARCHIVE</span></div>
+    <div class="nxs-live"><div class="nxs-live-dot"></div>SYNCED</div>
+  </div>
+</header>
+<div class="nxs-ticker"><div class="nxs-ticker-inner" id="ticker"></div></div>
+
+<div class="layout">
+  <!-- LEFT PANEL 
+  <div class="left-col">
+    <div class="nxs-panel-hdr">● RECENTLY LOGGED SYSTEMS</div>
+    <div id="feedList" class="nxs-loading"><div class="nxs-spinner"></div></div>
+  </div>
+
+  <!-- CENTER PANEL 
+  <div class="center-col">
+    <div class="stats-strip">
+      <div class="nxs-stat-big"><div class="val sv-cyan" id="sc-total">—</div><div class="lbl">TOTAL CONFIRMED</div></div>
+      <div class="nxs-stat-big"><div class="val sv-green" id="sc-stars">—</div><div class="lbl">HOST STARS</div></div>
+      <div class="nxs-stat-big"><div class="val sv-orange" id="sc-transit">—</div><div class="lbl">TRANSIT METHOD</div></div>
+      <div class="nxs-stat-big"><div class="val sv-purple" id="sc-latest">—</div><div class="lbl">NEWEST LOG</div></div>
+    </div>
+    
+    <div class="controls-bar">
+      <div class="nxs-filters">
+        <button class="nxs-fbtn active" onclick="filterBy('all')">ALL PLANETS</button>
+        <button class="nxs-fbtn" onclick="filterBy('Transit')">TRANSIT METHOD</button>
+        <button class="nxs-fbtn" onclick="filterBy('Radial Velocity')">RADIAL VELOCITY</button>
+        <button class="nxs-fbtn" onclick="filterBy('Kepler')">KEPLER FACILITY</button>
+        <button class="nxs-fbtn" onclick="filterBy('TESS')">TESS FACILITY</button>
+      </div>
+      <input class="nxs-search" id="searchQ" placeholder="SEARCH PLANET/STAR..." style="width:200px;" oninput="applyFilters()">
+      <button class="nxs-fbtn" onclick="fetchLiveAPI()" style="margin-left:auto;">↺ NASA SYNC</button>
+    </div>
+
+    <div class="table-wrap">
+      <div class="tbl-top">
+        <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--cyan);opacity:.8;">● EXOPLANETS DATABASE</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rcount">0 records</span>
+      </div>
+      <div id="tableLoading" class="nxs-loading"><div class="nxs-spinner"></div><div class="nxs-loading-text">FETCHING DATA...</div></div>
+      <table class="nxs-table" id="dataTable" style="display:none;">
+        <thead><tr><th>PLANET NAME</th><th>HOST STAR</th><th>DISCOVERY YEAR</th><th>METHOD</th><th>FACILITY</th></tr></thead>
+        <tbody id="tableBody">
+          {% for exoplanet in exoplanets %}
+          <tr>
+            <td class="td-name">{{ exoplanet.name }}</td>
+            <td class="td-hl">{{ exoplanet.host_star }}</td>
+            <td class="td-purple">{{ exoplanet.discovery_year }}</td>
+            <td style="color:var(--text-dim)">{{ exoplanet.discovery_method }}</td>
+            <td class="td-orange">{{ exoplanet.facility }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('exoplanets');
+const t = '▶ HUBBLE: Spectrophotometry reveals clouds on super-Earth&nbsp;&nbsp;●&nbsp;&nbsp;▶ TRAPPIST-1: New resonance models refine mass estimates&nbsp;&nbsp;●&nbsp;&nbsp;▶ EXOPLANET ARCHIVE: +14 confirmed planets this week';
+document.getElementById('ticker').innerHTML = `<span>${t}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${t}</span>`;
+
+let allData = [];
+
+// Scrape fallback data from jinja table
+const rows = document.querySelectorAll('#tableBody tr');
+if (rows.length > 0) {
+  rows.forEach(r => {
+    const tds = r.querySelectorAll('td');
+    if(tds.length === 5) {
+      allData.push({
+        name: tds[0].innerText, host_star: tds[1].innerText, year: tds[2].innerText,
+        method: tds[3].innerText, facility: tds[4].innerText
+      });
+    }
+  });
+} else {
+  // Mock Baseline
+  allData = [
+    {name:'Kepler-186 f', host_star:'Kepler-186', year:'2014', method:'Transit', facility:'Kepler'},
+    {name:'TRAPPIST-1 e', host_star:'TRAPPIST-1', year:'2017', method:'Transit', facility:'Spitzer'},
+    {name:'Proxima Centauri b', host_star:'Proxima Centauri', year:'2016', method:'Radial Velocity', facility:'ESO 3.6m'},
+    {name:'K2-18 b', host_star:'K2-18', year:'2015', method:'Transit', facility:'K2'},
+    {name:'51 Pegasi b', host_star:'51 Pegasi', year:'1995', method:'Radial Velocity', facility:'Haute-Provence'},
+  ];
+}
+
+let filtered = [...allData];
+
+function renderTable() {
+  document.getElementById('rcount').textContent = filtered.length + ' PLANETS';
+  document.getElementById('sc-total').textContent = allData.length;
+  document.getElementById('sc-stars').textContent = new Set(allData.map(x=>x.host_star)).size;
+  document.getElementById('sc-transit').textContent = allData.filter(x=>x.method==='Transit').length;
+  const years = allData.map(x=>parseInt(x.year)).filter(x=>!isNaN(x));
+  document.getElementById('sc-latest').textContent = years.length ? Math.max(...years) : '—';
+
+  const tb = document.getElementById('tableBody');
+  tb.innerHTML = filtered.map(d => `
+    <tr>
+      <td class="td-name">${d.name}</td>
+      <td class="td-hl">${d.host_star}</td>
+      <td class="td-purple">${d.year}</td>
+      <td style="color:var(--text-dim)">${d.method}</td>
+      <td class="td-orange">${d.facility}</td>
+    </tr>
+  `).join('');
+  
+  if (allData.length > 0) {
+    document.getElementById('feedList').innerHTML = allData.slice(0,8).map(d => `
+      <div class="planet-card">
+        <div class="planet-name">${d.name}</div>
+        <div class="planet-meta"><span>★ ${d.host_star}</span><span style="color:var(--green)">${d.year}</span></div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('feedList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:9px;">NO DATA AVAILABLE</div>';
+  }
+
+  document.getElementById('tableLoading').style.display = 'none';
+  document.getElementById('dataTable').style.display = 'table';
+}
+
+function filterBy(kw) {
+  document.querySelectorAll('.nxs-filters .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  const sq = document.getElementById('searchQ').value.toLowerCase();
+  filtered = allData.filter(d => {
+    if(kw !== 'all' && !d.method.includes(kw) && !d.facility.includes(kw)) return false;
+    if(sq && !d.name.toLowerCase().includes(sq) && !d.host_star.toLowerCase().includes(sq)) return false;
+    return true;
+  });
+  renderTable();
+}
+
+function applyFilters() {
+  const activeBtn = document.querySelector('.nxs-filters .active');
+  const kw = activeBtn ? (activeBtn.textContent === 'ALL PLANETS' ? 'all' : activeBtn.textContent.split(' ')[0]) : 'all';
+  // Note: Extracting just the first word isn't perfect for "Radial Velocity", so let's rely on mapping it back loosely:
+  let actualKw = 'all';
+  if(activeBtn.textContent.includes('TRANSIT')) actualKw = 'Transit';
+  else if(activeBtn.textContent.includes('RADIAL')) actualKw = 'Radial Velocity';
+  else if(activeBtn.textContent.includes('KEPLER')) actualKw = 'Kepler';
+  else if(activeBtn.textContent.includes('TESS')) actualKw = 'TESS';
+
+  filterBy(actualKw);
+  // Re-add active to the right button since filterBy clears and uses event.target which might be null here
+  document.querySelectorAll('.nxs-filters .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  activeBtn.classList.add('active');
+}
+
+async function fetchLiveAPI() {
+  document.getElementById('tableLoading').style.display = 'flex';
+  document.getElementById('dataTable').style.display = 'none';
+  
+  // ArtemisNexus has a generic getExoplanets method! Let's mock it inside ArtemisNexus or just fetch python!
+  try {
+    const res = await ArtemisNexus.fetch('/api/external/exoplanets'); // Python endpoint
+    if (res && res.length) {
+      allData = res.map(d => ({
+        name: d.planet_name || d.name, 
+        host_star: d.host_name || d.host_star, 
+        year: d.discovery_year || d.year,
+        method: d.discovery_method || d.method, 
+        facility: d.facility || 'Unknown'
+      }));
+      document.getElementById('apiSource').textContent = 'Live Python / Exo API';
+    }
+  } catch (err) {
+    console.warn("Exoplanet API failed", err);
+  }
+  applyFilters();
+}
+
+// Initial render
+setTimeout(()=>{
+  renderTable();
+  fetchLiveAPI();
+}, 200);
+
+</script>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artemis — Exoplanets Deep Space Habitability</title>
+<link rel="stylesheet" href="ArtemisNexus-style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ArtemisAPI.js"></script>
+<style>
+:root{--accent:#b060ff;--accent-dim:rgba(176,96,255,.12);--accent-glow:rgba(176,96,255,.4);}
+
+body::before{background-image:
+  radial-gradient(ellipse at 30% 0%,rgba(80,0,180,.12) 0%,transparent 50%),
+  radial-gradient(ellipse at 70% 100%,rgba(100,0,100,.1) 0%,transparent 50%),
+  radial-gradient(1px 1px at 12% 30%,rgba(176,96,255,.4) 0%,transparent 100%),
+  radial-gradient(1px 1px at 60% 70%,rgba(255,255,255,.3) 0%,transparent 100%),
+  radial-gradient(1.5px 1.5px at 85% 15%,rgba(0,229,255,.35) 0%,transparent 100%);}
+
+/* ── LAYOUT ── */
+.layout{display:grid;grid-template-columns:240px 1fr 300px;height:calc(100vh - 70px);position:relative;z-index:5;}
+.left-col{background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.center-col{display:flex;flex-direction:column;overflow:hidden;}
+.right-col{background:var(--bg-panel);border-left:1px solid var(--border);overflow-y:auto;}
+
+/* ── LEFT RECENTLY LOGGED ── */
+.logged-list{flex:1;overflow-y:auto;padding:6px 8px;}
+.logged-item{padding:8px 10px;border-left:2px solid var(--border);margin-bottom:6px;cursor:pointer;transition:all .2s;position:relative;}
+.logged-item:hover,.logged-item.active{border-left-color:var(--accent);background:var(--accent-dim);}
+.logged-planet{font-family:var(--font-display);font-size:10px;color:var(--text-primary);letter-spacing:1px;}
+.logged-meta{font-family:var(--font-mono);font-size:8px;color:var(--text-dim);margin-top:3px;line-height:1.5;}
+.hz-badge{display:inline-block;font-family:var(--font-mono);font-size:7px;padding:1px 5px;margin-top:3px;}
+.hz-yes{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.25);}
+.hz-no{background:rgba(255,48,96,.08);color:var(--red);border:1px solid rgba(255,48,96,.2);}
+
+/* ── CANVAS AREA (star map) ── */
+.starmap-wrap{position:relative;height:280px;background:#000;border-bottom:1px solid var(--border);overflow:hidden;flex-shrink:0;}
+#starmapCanvas{position:absolute;inset:0;width:100%;height:100%;}
+.starmap-hud{position:absolute;inset:0;pointer-events:none;}
+.starmap-hud::before,.starmap-hud::after{content:'';position:absolute;width:18px;height:18px;border-color:var(--accent);border-style:solid;opacity:.5;}
+.starmap-hud::before{top:10px;left:10px;border-width:2px 0 0 2px;}
+.starmap-hud::after{bottom:10px;right:10px;border-width:0 2px 2px 0;}
+.sm-label{position:absolute;top:12px;left:50%;transform:translateX(-50%);font-family:var(--font-display);font-size:8px;letter-spacing:4px;color:var(--accent);opacity:.7;}
+
+/* ── STATS ── */
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(2,8,20,.95);}
+.stats-strip .nxs-stat-big{border-right:1px solid var(--border);}
+.stats-strip .nxs-stat-big:last-child{border-right:none;}
+
+/* ── CONTROLS ── */
+.controls-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(3,12,28,.9);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.nasa-btn{font-family:var(--font-mono);font-size:9px;padding:5px 12px;background:rgba(176,96,255,.1);border:1px solid rgba(176,96,255,.35);color:var(--accent);cursor:pointer;transition:all .25s;letter-spacing:1px;}
+.nasa-btn:hover{background:rgba(176,96,255,.2);}
+
+/* ── TABLE ── */
+.table-wrap{flex:1;overflow-y:auto;}
+.tbl-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(4,14,30,.8);position:sticky;top:0;z-index:5;}
+
+/* ── RIGHT DETAIL ── */
+.detail-wrap{padding:14px;border-bottom:1px solid var(--border);}
+.exo-name{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--accent);text-shadow:0 0 12px var(--accent-glow);margin-bottom:3px;letter-spacing:2px;}
+.exo-star{font-family:var(--font-mono);font-size:9px;color:var(--orange);letter-spacing:2px;margin-bottom:10px;}
+
+/* ESI ring */
+.esi-wrap{display:flex;align-items:center;gap:12px;padding:10px;background:rgba(176,96,255,.07);border:1px solid rgba(176,96,255,.2);margin:10px 0;}
+.esi-ring{position:relative;width:60px;height:60px;flex-shrink:0;}
+#esiCanvas{width:60px;height:60px;}
+.esi-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--accent);}
+.esi-info{flex:1;}
+.esi-label{font-family:var(--font-mono);font-size:8px;color:var(--text-dim);letter-spacing:1px;}
+.esi-desc{font-family:var(--font-mono);font-size:9px;color:var(--text-secondary);margin-top:3px;line-height:1.4;}
+
+/* Charts */
+.chart-box{padding:12px;border-bottom:1px solid var(--border);}
+.chart-box-title{font-family:var(--font-display);font-size:7px;letter-spacing:2px;color:var(--accent);margin-bottom:8px;opacity:.8;}
+.chart-box .nxs-chart-wrap{height:110px;}
+
+/* API info */
+.api-info-row{font-family:var(--font-mono);font-size:8px;color:var(--text-dim);padding:3px 0;border-bottom:1px solid rgba(176,96,255,.05);}
+.api-info-row span{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header class="nxs-header" style="border-bottom-color:rgba(176,96,255,.4);">
+  <div class="nxs-logo">
+    <div class="nxs-logo-icon" style="border-color:var(--accent);box-shadow:0 0 15px var(--accent-glow),inset 0 0 15px var(--accent-dim);"></div>
+    <div>
+      <div class="nxs-logo-text" style="color:var(--accent);text-shadow:0 0 20px var(--accent-glow);">ARTEMIS<span style="color:var(--cyan);">NEXUS</span></div>
+      <div class="nxs-logo-sub">DEEP SPACE HABITABILITY EXPLORER</div>
+    </div>
+  </div>
+  <div id="navMount"></div>
+  <div class="nxs-hdr-right">
+    <div class="nxs-stat">API SOURCE<span id="apiSrc" style="color:var(--green);">LIVE NASA EXOPLANET ARCHIVE</span></div>
+    <div class="nxs-live" style="color:var(--green);"><div class="nxs-live-dot"></div>SYNCED</div>
+  </div>
+</header>
+
+<div class="nxs-ticker"><div class="nxs-ticker-inner" id="ticker"></div></div>
+
+<div class="layout">
+
+  <div class="left-col">
+    <div class="nxs-panel-hdr" style="color:var(--accent);">● RECENTLY LOGGED SYSTEMS</div>
+    <div class="logged-list" id="loggedList">
+      <div class="nxs-loading"><div class="nxs-spinner"></div></div>
+    </div>
+  </div>
+
+  <div class="center-col">
+
+    <div class="starmap-wrap">
+      <canvas id="starmapCanvas"></canvas>
+      <div class="starmap-hud"></div>
+      <div class="sm-label">EXOPLANET PROXIMITY MAP — RELATIVE DISTANCES</div>
+      <div style="position:absolute;bottom:10px;left:14px;font-family:var(--font-mono);font-size:8px;color:rgba(176,96,255,.5);line-height:1.8;">
+        <div style="color:var(--green);">● HABITABLE ZONE</div>
+        <div style="color:rgba(176,96,255,.7);">● NON-HABITABLE</div>
+        <div style="color:rgba(255,192,64,.7);">★ HOST STAR</div>
+      </div>
+      <div style="position:absolute;bottom:10px;right:14px;font-family:var(--font-mono);font-size:8px;color:rgba(176,96,255,.5);text-align:right;line-height:1.8;" id="smInfo">
+        HOVER PLANET<br>—<br>—
+      </div>
+    </div>
+
+    <div class="stats-strip">
+      <div class="nxs-stat-big"><div class="val sv-purple" id="sc-total">—</div><div class="lbl">TOTAL CONFIRMED</div></div>
+      <div class="nxs-stat-big"><div class="val sv-green" id="sc-hz">—</div><div class="lbl">IN HABITABLE ZONE</div></div>
+      <div class="nxs-stat-big"><div class="val sv-orange" id="sc-transit">—</div><div class="lbl">TRANSIT METHOD</div></div>
+      <div class="nxs-stat-big"><div class="val sv-cyan" id="sc-nearest">—</div><div class="lbl">NEAREST LOG</div></div>
+    </div>
+
+    <div class="controls-bar">
+      <div class="nxs-filters" id="fBtns">
+        <button class="nxs-fbtn active" onclick="filterEx('all',this)">ALL PLANETS</button>
+        <button class="nxs-fbtn" onclick="filterEx('Transit',this)">TRANSIT METHOD</button>
+        <button class="nxs-fbtn" onclick="filterEx('Radial Velocity',this)">RADIAL VELOCITY</button>
+        <button class="nxs-fbtn" onclick="filterEx('Kepler',this)">KEPLER FACILITY</button>
+        <button class="nxs-fbtn" onclick="filterEx('TESS',this)">TESS FACILITY</button>
+      </div>
+      <input class="nxs-search" id="searchQ" placeholder="SEARCH PLANET/STAR…" style="width:180px;" oninput="renderTable()">
+      <button class="nasa-btn" onclick="nasaSync()">↺ NASA SYNC</button>
+    </div>
+
+    <div class="table-wrap">
+      <div class="tbl-top">
+        <span style="font-family:var(--font-display);font-size:8px;letter-spacing:3px;color:var(--accent);opacity:.8;">● EXOPLANETS DATABASE</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);" id="rowCount">—</span>
+      </div>
+      <div id="tableLoading" class="nxs-loading" style="min-height:200px;">
+        <div class="nxs-spinner"></div><div class="nxs-loading-text">FETCHING DATA…</div>
+      </div>
+      <table class="nxs-table" id="exoTable" style="display:none;">
+        <thead>
+          <tr>
+            <th>PLANET NAME</th><th>HOST STAR</th><th>METHOD</th><th>FACILITY</th>
+            <th>DISTANCE (LY)</th><th>MASS</th><th>RADIUS</th><th>HAB. ZONE</th><th>ESI</th><th>DISC. YEAR</th>
+          </tr>
+        </thead>
+        <tbody id="exoTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-col">
+    <div class="nxs-panel-hdr" style="color:var(--accent);">● SELECTED SYSTEM</div>
+
+    <div class="detail-wrap">
+      <div class="exo-name" id="detName">SELECT A PLANET</div>
+      <div class="exo-star" id="detStar">—</div>
+
+      <!-- ESI Ring -->
+      <div class="esi-wrap">
+        <div class="esi-ring">
+          <canvas id="esiCanvas" width="60" height="60"></canvas>
+          <div class="esi-val" id="esiVal">—</div>
+        </div>
+        <div class="esi-info">
+          <div class="esi-label">EARTH SIMILARITY INDEX (ESI)</div>
+          <div class="esi-desc" id="esiDesc">Select a planet to compute habitability score</div>
+        </div>
+      </div>
+
+      <div id="detRows"></div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-box-title">▸ DISCOVERY METHOD BREAKDOWN</div>
+      <div class="nxs-chart-wrap"><canvas id="methodChart"></canvas></div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-box-title">▸ ESI DISTRIBUTION (HABITABILITY)</div>
+      <div class="nxs-chart-wrap"><canvas id="esiChart"></canvas></div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-box-title">▸ DISCOVERY TIMELINE</div>
+      <div class="nxs-chart-wrap"><canvas id="yearChart"></canvas></div>
+    </div>
+
+    <div style="padding:14px;">
+      <div class="nxs-panel-hdr" style="border:none;padding:0 0 8px;color:var(--accent);">● API INTEGRATION</div>
+      <div class="api-info-row">NASA EXOPLANET ARCHIVE <span>TAP v1.0</span></div>
+      <div class="api-info-row">URL <span style="font-size:7px;">exoplanetarchive.ipac.caltech.edu/TAP</span></div>
+      <div class="api-info-row">JAVA ENDPOINT <span>/api/exoplanets</span></div>
+      <div class="api-info-row">RECORDS <span id="archiveCount">5,674+ confirmed</span></div>
+      <div class="api-info-row">MOCK MODE <span id="mockMode">ON — set false in nexus-api.js</span></div>
+      <div style="margin-top:10px;font-family:var(--font-mono);font-size:8px;color:rgba(176,96,255,.5);line-height:1.8;">
+        To enable live data:<br>
+        1. Set NEXUS.CONFIG.MOCK_MODE = false<br>
+        2. Add RestTemplate call in ApiController.java<br>
+        3. Map to Exoplanet model class<br>
+        4. Store in MongoDB ExoplanetRepository
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('navMount').innerHTML = NEXUS.renderHeader('exoplanets');
+
+const tItems = [
+  '▶ HUBBLE: Spectrophotometry reveals clouds on super-Earth GJ 1214b',
+  '▶ TRAPPIST-1: New resonance models refine mass estimates for all 7 planets',
+  '▶ EXOPLANET ARCHIVE: +14 confirmed planets this week — total 5,674+',
+  '▶ JWST: TOI-700d atmospheric characterization scheduled Q3 2026',
+  '▶ NASA Exoplanet Archive API: Free at exoplanetarchive.ipac.caltech.edu/TAP',
+];
+const tc = tItems.join('&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;');
+document.getElementById('ticker').innerHTML = `<span>${tc}&nbsp;&nbsp;&nbsp;●&nbsp;&nbsp;&nbsp;${tc}</span>`;
+
+// ── STATE ─────────────────────────────────────────────────────
+let allEx = [], filtered = [], selIdx = -1, currentFilter = 'all';
+let methodChart, esiChart, yearChartInst;
+
+// ── LOAD ──────────────────────────────────────────────────────
+async function loadExoplanets() {
+  let data = null;
+  if (!NEXUS.CONFIG.MOCK_MODE) {
+    try {
+      const res = await fetch('/api/exoplanets');
+      if (res.ok) { data = await res.json(); document.getElementById('apiSrc').textContent = 'JAVA BACKEND ✓'; }
+    } catch(e) {}
+  }
+  if (!data) data = await NEXUS.getExoplanets();
+  allEx = data || [];
+
+  // Stats
+  const hz = allEx.filter(e => e.habitableZone).length;
+  const transit = allEx.filter(e => e.method === 'Transit').length;
+  const nearest = allEx.slice().sort((a,b) => parseFloat(a.distance||999) - parseFloat(b.distance||999))[0];
+  document.getElementById('sc-total').textContent = allEx.length;
+  document.getElementById('sc-hz').textContent = hz;
+  document.getElementById('sc-transit').textContent = transit;
+  document.getElementById('sc-nearest').textContent = nearest ? nearest.name.split(' ')[0] : '—';
+
+  buildLoggedList();
+  filterEx(currentFilter);
+  buildCharts();
+  drawStarmap();
+  document.getElementById('tableLoading').style.display = 'none';
+  document.getElementById('exoTable').style.display = 'table';
+}
+
+// ── LOGGED LIST ───────────────────────────────────────────────
+function buildLoggedList() {
+  document.getElementById('loggedList').innerHTML = allEx.map((e, i) => `
+    <div class="logged-item${selIdx===i?' active':''}" onclick="selectEx(${i})">
+      <div class="logged-planet">${e.name}</div>
+      <div class="logged-meta">
+        ${e.hostStar} · ${e.discoveryYear}<br>
+        ${e.distance}
+      </div>
+      <span class="hz-badge ${e.habitableZone?'hz-yes':'hz-no'}">${e.habitableZone?'HABITABLE ZONE':'NON-HABITABLE'}</span>
+    </div>`).join('');
+}
+
+// ── FILTER ────────────────────────────────────────────────────
+function filterEx(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('#fBtns .nxs-fbtn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (f === 'all') filtered = [...allEx];
+  else if (f === 'Kepler') filtered = allEx.filter(e => e.facility?.includes('Kepler') || e.facility?.includes('K2'));
+  else if (f === 'TESS') filtered = allEx.filter(e => e.facility?.includes('TESS'));
+  else filtered = allEx.filter(e => e.method === f);
+  renderTable();
+}
+
+function renderTable() {
+  const q = document.getElementById('searchQ').value.toLowerCase();
+  let rows = q ? filtered.filter(e => e.name?.toLowerCase().includes(q) || e.hostStar?.toLowerCase().includes(q)) : filtered;
+  document.getElementById('rowCount').textContent = `${rows.length} PLANETS`;
+  document.getElementById('exoTbody').innerHTML = rows.map((e, i) => {
+    const idx = allEx.indexOf(e);
+    const hzColor = e.habitableZone ? 'td-good' : 'td-danger';
+    const esiVal = e.ESI || 0;
+    const esiColor = esiVal > 0.8 ? 'td-good' : esiVal > 0.5 ? 'td-warn' : 'td-danger';
+    return `<tr onclick="selectEx(${idx})" class="${selIdx===idx?'selected':''}">
+      <td class="td-name">${e.name}</td>
+      <td class="td-orange">${e.hostStar}</td>
+      <td style="color:var(--cyan);font-size:8px;">${e.method}</td>
+      <td style="color:var(--text-dim);font-size:8px;">${e.facility}</td>
+      <td class="td-hl">${e.distance}</td>
+      <td style="color:var(--text-secondary);">${e.mass}</td>
+      <td style="color:var(--text-secondary);">${e.radius}</td>
+      <td class="${hzColor}"><span class="nxs-badge ${e.habitableZone?'badge-active':'badge-critical'}">${e.habitableZone?'YES':'NO'}</span></td>
+      <td class="${esiColor}">${esiVal}</td>
+      <td class="td-purple">${e.discoveryYear}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="10" style="text-align:center;padding:40px;font-family:var(--font-mono);color:var(--text-dim);">NO EXOPLANETS MATCH FILTERS</td></tr>`;
+}
+
+// ── SELECT ────────────────────────────────────────────────────
+function selectEx(i) {
+  selIdx = i;
+  const e = allEx[i];
+  document.getElementById('detName').textContent = e.name;
+  document.getElementById('detStar').textContent = 'HOST: ' + e.hostStar;
+  document.getElementById('detRows').innerHTML = [
+    ['DISCOVERY YEAR', e.discoveryYear], ['METHOD', e.method], ['FACILITY', e.facility],
+    ['DISTANCE', e.distance], ['MASS', e.mass], ['RADIUS', e.radius],
+    ['HABITABLE ZONE', e.habitableZone ? '✓ YES' : '✗ NO'],
+    ['ATMOSPHERE', e.atmosphere], ['ESI SCORE', e.ESI || '—']
+  ].map(([l,v]) => `<div class="nxs-drow"><span class="nxs-drow-lbl">${l}</span><span class="nxs-drow-val">${v||'—'}</span></div>`).join('');
+
+  // ESI ring
+  const esi = e.ESI || 0;
+  const cv = document.getElementById('esiCanvas');
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,60,60);
+  ctx.beginPath(); ctx.arc(30,30,25,0,Math.PI*2); ctx.strokeStyle='rgba(176,96,255,.2)'; ctx.lineWidth=4; ctx.stroke();
+  ctx.beginPath(); ctx.arc(30,30,25,-Math.PI/2,-Math.PI/2+esi*Math.PI*2);
+  const col = esi>0.8?'#00ff88':esi>0.5?'#ffc040':'#ff3060';
+  ctx.strokeStyle=col; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
+  document.getElementById('esiVal').textContent = esi;
+  document.getElementById('esiVal').style.color = col;
+  document.getElementById('esiDesc').textContent = esi>0.8?'HIGH SIMILARITY TO EARTH':esi>0.6?'MODERATE SIMILARITY':'LOW SIMILARITY';
+
+  buildLoggedList(); renderTable();
+}
+
+// ── CHARTS ────────────────────────────────────────────────────
+function buildCharts() {
+  const mc = {}; allEx.forEach(e => { mc[e.method]=(mc[e.method]||0)+1; });
+  if (methodChart) methodChart.destroy();
+  methodChart = new Chart(document.getElementById('methodChart'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(mc), datasets: [{ data: Object.values(mc), backgroundColor: ['rgba(176,96,255,.7)','rgba(0,229,255,.6)','rgba(0,255,136,.6)','rgba(255,192,64,.6)','rgba(255,107,43,.6)'], borderWidth:1 }] },
+    options: { ...NEXUS.chartDefaults('#b060ff'), cutout:'55%' }
+  });
+
+  const esiRanges = {'0.0-0.3':0,'0.3-0.6':0,'0.6-0.8':0,'0.8-1.0':0};
+  allEx.forEach(e => {
+    const v = e.ESI||0;
+    if(v<0.3) esiRanges['0.0-0.3']++;
+    else if(v<0.6) esiRanges['0.3-0.6']++;
+    else if(v<0.8) esiRanges['0.6-0.8']++;
+    else esiRanges['0.8-1.0']++;
+  });
+  if (esiChart) esiChart.destroy();
+  esiChart = new Chart(document.getElementById('esiChart'), {
+    type: 'bar',
+    data: { labels: Object.keys(esiRanges), datasets: [{ data: Object.values(esiRanges), backgroundColor: ['rgba(255,48,96,.5)','rgba(255,192,64,.5)','rgba(0,229,255,.5)','rgba(0,255,136,.6)'], borderColor:['#ff3060','#ffc040','#00e5ff','#00ff88'], borderWidth:1 }] },
+    options: { ...NEXUS.chartDefaults('#b060ff'), plugins:{legend:{display:false}}, scales:{...NEXUS.chartDefaults('#b060ff').scales, x:{...NEXUS.chartDefaults().scales.x,title:{display:true,text:'ESI RANGE',color:'var(--text-dim)',font:{family:"'Share Tech Mono'",size:7}}}} }
+  });
+
+  const yc = {}; allEx.forEach(e => { yc[e.discoveryYear]=(yc[e.discoveryYear]||0)+1; });
+  const sortedY = Object.keys(yc).sort();
+  if (yearChartInst) yearChartInst.destroy();
+  yearChartInst = new Chart(document.getElementById('yearChart'), {
+    type:'line',
+    data:{ labels:sortedY, datasets:[{ data:sortedY.map(y=>yc[y]), borderColor:'#b060ff', backgroundColor:'rgba(176,96,255,.08)', borderWidth:1.5, pointRadius:3, pointBackgroundColor:'#b060ff', tension:.3, fill:true }] },
+    options: { ...NEXUS.chartDefaults('#b060ff'), plugins:{legend:{display:false}} }
+  });
+}
+
+// ── STAR MAP CANVAS ───────────────────────────────────────────
+function drawStarmap() {
+  const cv = document.getElementById('starmapCanvas');
+  const ctx = cv.getContext('2d');
+  cv.width = cv.parentElement.offsetWidth;
+  cv.height = cv.parentElement.offsetHeight;
+  const w=cv.width, h=cv.height, cx=w/2, cy=h/2;
+
+  ctx.clearRect(0,0,w,h);
+
+  // Stars background
+  for(let i=0;i<200;i++){
+    ctx.fillStyle=`rgba(255,255,255,${Math.random()*.5+.05})`;
+    ctx.fillRect(Math.random()*w, Math.random()*h, 1, 1);
+  }
+
+  // Sun (center = Sol)
+  const sg = ctx.createRadialGradient(cx,cy,0,cx,cy,25);
+  sg.addColorStop(0,'rgba(255,240,200,.9)');sg.addColorStop(.5,'rgba(255,200,50,.4)');sg.addColorStop(1,'transparent');
+  ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(cx,cy,25,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2); ctx.fillStyle='#fff5cc'; ctx.fill();
+  ctx.fillStyle='rgba(255,220,100,.6)'; ctx.font=`8px 'Share Tech Mono'`; ctx.fillText('SOL',cx+10,cy-10);
+
+  // Distance rings
+  [50,100,150,200,250].forEach(r => {
+    ctx.beginPath(); ctx.arc(cx,cy,r*(Math.min(w,h)/600),0,Math.PI*2);
+    ctx.strokeStyle='rgba(176,96,255,.07)'; ctx.lineWidth=1; ctx.setLineDash([2,6]); ctx.stroke(); ctx.setLineDash([]);
+  });
+
+  // Exoplanets
+  allEx.forEach((e, i) => {
+    const dist = parseFloat(e.distance)||100;
+    const r = Math.min(dist * 0.8 * (Math.min(w,h)/600), Math.min(w,h)*0.47);
+    const angle = (i / allEx.length) * Math.PI * 2;
+    const px = cx + Math.cos(angle) * r;
+    const py = cy + Math.sin(angle) * r * 0.6;
+    const sz = Math.max(3, (e.ESI||0.3) * 8);
+    const color = e.habitableZone ? '#00ff88' : '#b060ff';
+
+    // Glow
+    const grd = ctx.createRadialGradient(px,py,0,px,py,sz*2.5);
+    grd.addColorStop(0,color+'60'); grd.addColorStop(1,'transparent');
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(px,py,sz*2.5,0,Math.PI*2); ctx.fill();
+
+    // Planet
+    ctx.beginPath(); ctx.arc(px,py,sz,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+
+    // Line from sol
+    if(e.habitableZone){
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(px,py);
+      ctx.strokeStyle='rgba(0,255,136,.08)'; ctx.lineWidth=1; ctx.stroke();
+    }
+  });
+}
+
+// ── NASA SYNC (Live API hook) ──────────────────────────────────
+async function nasaSync() {
+  document.getElementById('apiSrc').textContent = 'CONNECTING TO NASA…';
+  if (!NEXUS.CONFIG.MOCK_MODE) {
+    // Real: fetch from NASA Exoplanet Archive TAP service
+    // URL: https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+pl_name,hostname,discoverymethod,...+from+ps+where+default_flag=1&format=json
+    try {
+      const url = `${NEXUS.CONFIG.ENDPOINTS.NASA_EXOPLANET}?query=select+pl_name,hostname,discoverymethod,disc_year,pl_masse,pl_rade,st_dist+from+ps+where+default_flag=1+order+by+disc_year+desc&format=json`;
+      const res = await fetch(url);
+      if(res.ok){ document.getElementById('apiSrc').textContent='NASA ARCHIVE LIVE ✓'; }
+    } catch(e){ document.getElementById('apiSrc').textContent='NASA API UNAVAILABLE'; }
+  } else {
+    document.getElementById('apiSrc').textContent = 'MOCK MODE — Set MOCK_MODE=false';
+  }
+}
+
+// ── START ─────────────────────────────────────────────────────
+window.addEventListener('resize', drawStarmap);
+loadExoplanets();
+</script>
+</body>
+</html>

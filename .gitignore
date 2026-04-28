@@ -1,0 +1,46 @@
+### OS FILES ###
+.DS_Store
+Thumbs.db
+
+### IDE FILES ###
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+### JAVA / SPRING BOOT ###
+target/
+build/
+bin/
+out/
+*.class
+
+### GRADLE ###
+.gradle/
+
+### LOG FILES ###
+*.log
+
+### ENV FILES ###
+.env
+
+### PYTHON ###
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+### NODE (if used later) ###
+node_modules/
+
+### JDK (VERY IMPORTANT) ###
+jdk-*/
+*.zip
+
+### TEMP FILES ###
+*.tmp
+*.swp
+
+### GENERATED FILES ###
+compile_errors.txt

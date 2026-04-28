@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS — Mars Rover Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="ArtemisNexus-style.css">
+  <script src="ArtemisAPI.js"></script>
+  <style>
+    :root {
+      --bg-deep: #0a0402;
+      --bg-panel: rgba(20, 8, 4, 0.93);
+      --bg-card: rgba(28, 10, 5, 0.88);
+      --orange: #ff6b2b;
+      --orange-dim: rgba(255, 107, 43, 0.12);
+      --orange-glow: rgba(255, 107, 43, 0.4);
+      --red-mars: #e84020;
+      --cyan: #00e5ff;
+      --green: #00ff88;
+      --yellow: #ffc040;
+      --text-primary: #ffe8d6;
+      --text-secondary: #c87a54;
+      --text-dim: #663322;
+      --border: rgba(255, 107, 43, 0.18);
+      --border-bright: rgba(255, 107, 43, 0.45);
+      --font-display: 'Orbitron', monospace;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-body: 'Exo 2', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(180, 50, 20, 0.15) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 80%, rgba(100, 30, 10, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 107, 43, 0.012) 2px, rgba(255, 107, 43, 0.012) 4px);
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(12, 4, 2, 0.97);
+      border-bottom: 1px solid var(--border-bright);
+      box-shadow: 0 0 30px rgba(255, 107, 43, 0.1);
+    }
+
+    .logo-area { display: flex; align-items: center; gap: 16px; }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border: 2px solid var(--orange);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--orange-glow), inset 0 0 15px var(--orange-dim);
+      animation: pulse-ring 3s ease-in-out infinite;
+    }
+
+    .logo-icon::before {
+      content: '';
+      width: 14px;
+      height: 14px;
+      background: var(--red-mars);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--red-mars);
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 15px var(--orange-glow), inset 0 0 15px var(--orange-dim); }
+      50% { box-shadow: 0 0 30px var(--orange-glow), inset 0 0 25px var(--orange-dim); }
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--orange);
+      text-shadow: 0 0 20px var(--orange-glow);
+    }
+
+    .logo-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 3px;
+      margin-top: 2px;
+    }
+
+    .nav-links { display: flex; gap: 4px; }
+
+    .nav-link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 8px 18px;
+      border: 1px solid transparent;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      position: relative;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--orange);
+      border-color: var(--border);
+      background: var(--orange-dim);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--orange);
+      box-shadow: 0 0 8px var(--orange);
+    }
+
+    .header-status { display: flex; align-items: center; gap: 20px; }
+
+    .status-item {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .status-item span { color: var(--orange); display: block; font-size: 11px; }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--red-mars);
+      letter-spacing: 2px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--red-mars);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--red-mars);
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    /* ===== ROVER SELECTOR ===== */
+    .rover-selector {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 5, 2, 0.9);
+      padding: 0 24px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .rover-tab {
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--text-dim);
+      padding: 12px 24px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s;
+      position: relative;
+      user-select: none;
+    }
+
+    .rover-tab:hover { color: var(--text-secondary); }
+
+    .rover-tab.active {
+      color: var(--orange);
+      border-bottom-color: var(--orange);
+      text-shadow: 0 0 12px var(--orange-glow);
+    }
+
+    .rover-tab .tab-status {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .tab-status.op { background: var(--green); box-shadow: 0 0 6px var(--green); animation: blink 2s infinite; }
+    .tab-status.warn { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: blink 1s infinite; }
+    .tab-status.off { background: var(--text-dim); }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr 280px;
+      gap: 0;
+      height: calc(100vh - 106px);
+      position: relative;
+      z-index: 5;
+    }
+
+    /* ===== LEFT PANEL ===== */
+    .left-panel {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+
+    .left-panel::-webkit-scrollbar { width: 3px; }
+    .left-panel::-webkit-scrollbar-thumb { background: var(--orange-dim); }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 8px;
+      letter-spacing: 3px;
+      color: var(--orange);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2px;
+      opacity: 0.8;
+    }
+
+    /* Rover image placeholder */
+    .rover-visual {
+      position: relative;
+      height: 160px;
+      background: rgba(40, 15, 8, 0.6);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rover-img-overlay {
+      position: absolute;
+      inset: 0;
+      background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/PIA23764-MarsRoverPerseverance-20210218.jpg/1200px-PIA23764-MarsRoverPerseverance-20210218.jpg') center/cover;
+      opacity: 0.7;
+    }
+
+    .rover-img-hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .rover-img-hud::before, .rover-img-hud::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-color: var(--orange);
+      border-style: solid;
+      opacity: 0.7;
+    }
+
+    .rover-img-hud::before { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+    .rover-img-hud::after { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+    .rover-img-label {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--orange);
+      letter-spacing: 2px;
+      background: rgba(0,0,0,0.7);
+      padding: 2px 8px;
+    }
+
+    /* Metric cards */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .metric-card {
+      background: rgba(30, 10, 5, 0.7);
+      border: 1px solid var(--border);
+      padding: 10px;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .metric-card:hover {
+      border-color: var(--orange);
+      background: var(--orange-dim);
+    }
+
+    .metric-icon {
+      font-size: 16px;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .metric-value {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--orange);
+      line-height: 1;
+      text-shadow: 0 0 10px var(--orange-glow);
+    }
+
+    .metric-unit {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-secondary);
+      display: inline;
+      margin-left: 2px;
+    }
+
+    .metric-label {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      margin-top: 3px;
+    }
+
+    .metric-card.highlight { border-color: rgba(255,192,64,0.3); }
+    .metric-card.highlight .metric-value { color: var(--yellow); text-shadow: 0 0 10px rgba(255,192,64,0.5); }
+
+    /* Location display */
+    .location-block {
+      background: rgba(30,10,5,0.6);
+      border: 1px solid var(--border);
+      padding: 12px;
+    }
+
+    .location-name {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--orange);
+      text-shadow: 0 0 8px var(--orange-glow);
+      margin-bottom: 6px;
+    }
+
+    .location-coords {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      letter-spacing: 1px;
+    }
+
+    .location-coords span { color: var(--text-dim); margin-right: 8px; }
+
+    /* Sample counter */
+    .sample-counter {
+      background: rgba(30,10,5,0.6);
+      border: 1px solid var(--border);
+      padding: 12px;
+    }
+
+    .sample-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,107,43,0.06);
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .sample-row:last-child { border-bottom: none; }
+    .sample-label { color: var(--text-dim); letter-spacing: 1px; }
+    .sample-val { color: var(--orange); }
+    .sample-val.green-text { color: var(--green); }
+    .sample-val.yellow-text { color: var(--yellow); }
+
+    /* ===== CENTER PANEL ===== */
+    .center-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Mars surface map */
+    .mars-map {
+      position: relative;
+      flex: 1;
+      background: #1a0a04;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .mars-surface {
+      position: absolute;
+      inset: 0;
+      background:
+        url('https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg') center/cover;
+      opacity: 0.35;
+      filter: saturate(1.2);
+    }
+
+    .mars-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,107,43,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,107,43,0.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .mars-overlay {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(10, 2, 0, 0.6) 100%);
+    }
+
+    .mars-hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    /* Corner brackets */
+    .mars-hud::before, .mars-hud::after {
+      content: '';
+      position: absolute;
+      width: 25px;
+      height: 25px;
+      border-color: var(--orange);
+      border-style: solid;
+      opacity: 0.5;
+    }
+    .mars-hud::before { top: 14px; left: 14px; border-width: 2px 0 0 2px; }
+    .mars-hud::after { bottom: 14px; right: 14px; border-width: 0 2px 2px 0; }
+
+    .mars-label {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-display);
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: var(--orange);
+      opacity: 0.7;
+    }
+
+    /* Rover position marker */
+    .rover-marker {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+    }
+
+    .rover-marker-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: 0 0 15px var(--orange);
+      animation: ping 2s infinite;
+      position: relative;
+    }
+
+    .rover-marker-ring {
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 1px solid var(--orange);
+      opacity: 0.5;
+      animation: expand 2s ease-out infinite;
+    }
+
+    @keyframes ping {
+      0%, 100% { box-shadow: 0 0 15px var(--orange); }
+      50% { box-shadow: 0 0 25px var(--orange), 0 0 40px rgba(255,107,43,0.3); }
+    }
+
+    @keyframes expand {
+      0% { transform: scale(1); opacity: 0.5; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    .rover-marker-label {
+      position: absolute;
+      top: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--orange);
+      white-space: nowrap;
+      text-shadow: 0 0 8px var(--orange-glow);
+      background: rgba(0,0,0,0.6);
+      padding: 1px 5px;
+    }
+
+    /* Discover markers */
+    .discovery-marker {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      cursor: pointer;
+    }
+
+    .discovery-marker.old {
+      background: var(--yellow);
+      box-shadow: 0 0 8px var(--yellow);
+      width: 6px;
+      height: 6px;
+    }
+
+    /* Bottom charts bar */
+    .charts-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      height: 200px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .mini-chart {
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      padding: 10px 12px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mini-chart:last-child { border-right: none; }
+
+    .mini-chart-title {
+      font-family: var(--font-display);
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: var(--orange);
+      margin-bottom: 8px;
+      opacity: 0.8;
+    }
+
+    .mini-chart-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ===== RIGHT PANEL ===== */
+    .right-panel {
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .right-panel::-webkit-scrollbar { width: 3px; }
+    .right-panel::-webkit-scrollbar-thumb { background: var(--orange-dim); }
+
+    /* Instrument status */
+    .instrument-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,107,43,0.06);
+    }
+
+    .inst-name {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-secondary);
+      letter-spacing: 1px;
+    }
+
+    .inst-status {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+
+    .inst-on { background: rgba(0,255,136,0.12); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+    .inst-standby { background: rgba(255,192,64,0.12); color: var(--yellow); border: 1px solid rgba(255,192,64,0.3); }
+    .inst-off { background: rgba(100,50,30,0.3); color: var(--text-dim); border: 1px solid rgba(100,50,30,0.4); }
+
+    /* Surface data table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .data-table th {
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      padding: 4px 6px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-weight: normal;
+    }
+
+    .data-table td {
+      color: var(--text-secondary);
+      padding: 5px 6px;
+      border-bottom: 1px solid rgba(255,107,43,0.05);
+    }
+
+    .data-table td.val { color: var(--orange); }
+    .data-table tr:hover td { background: rgba(255,107,43,0.04); }
+
+    /* Recent discoveries list */
+    .discovery-item {
+      padding: 8px;
+      background: rgba(30,10,5,0.6);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--orange);
+      margin-bottom: 6px;
+      transition: all 0.3s;
+    }
+
+    .discovery-item:hover {
+      border-color: var(--orange);
+      background: var(--orange-dim);
+    }
+
+    .discovery-title {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .discovery-meta {
+      font-size: 8px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+    }
+
+    .discovery-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 7px;
+      padding: 1px 5px;
+      border-radius: 2px;
+      margin-top: 3px;
+      background: rgba(255,107,43,0.15);
+      color: var(--orange);
+      border: 1px solid rgba(255,107,43,0.3);
+    }
+
+    .discovery-tag.bio { background: rgba(0,255,136,0.1); color: var(--green); border-color: rgba(0,255,136,0.3); }
+    .discovery-tag.geo { background: rgba(255,192,64,0.1); color: var(--yellow); border-color: rgba(255,192,64,0.3); }
+
+    /* Animate in */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .anim { animation: fadeSlideIn 0.5s ease forwards; opacity: 0; }
+    .anim:nth-child(1) { animation-delay: 0.1s; }
+    .anim:nth-child(2) { animation-delay: 0.2s; }
+    .anim:nth-child(3) { animation-delay: 0.3s; }
+    .anim:nth-child(4) { animation-delay: 0.4s; }
+    .anim:nth-child(5) { animation-delay: 0.5s; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo-area">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text">NEXUS</div>
+      <div class="logo-sub">MARS ROVER MONITOR</div>
+    </div>
+  </div>
+
+  <div id="navMount"></div>
+
+  <div class="header-status">
+    <div class="status-item">MARS SOL <span id="solDay">1468</span></div>
+    <div class="status-item">MARS TEMP <span id="marsTemp">-63°C</span></div>
+    <div class="live-indicator"><div class="live-dot"></div> MARS LINK</div>
+  </div>
+</header>
+
+<!-- ROVER SELECTOR TABS -->
+<div class="rover-selector">
+  <div class="rover-tab active" onclick="selectRover(this, 'perseverance')">
+    <span class="tab-status op"></span>PERSEVERANCE
+  </div>
+  <div class="rover-tab" onclick="selectRover(this, 'curiosity')">
+    <span class="tab-status op"></span>CURIOSITY
+  </div>
+  <div class="rover-tab" onclick="selectRover(this, 'ingenuity')">
+    <span class="tab-status warn"></span>INGENUITY
+  </div>
+</div>
+
+<div class="main-layout">
+
+  <!-- LEFT PANEL -->
+  <aside class="left-panel">
+    <div class="section-title">● ROVER VISUAL</div>
+
+    <div class="rover-visual">
+      <div class="rover-img-overlay" id="roverImg"></div>
+      <div class="rover-img-hud"></div>
+      <div class="rover-img-label" id="roverImgLabel">PERSEVERANCE · JEZERO CRATER</div>
+    </div>
+
+    <div class="section-title">● ENVIRONMENTAL DATA</div>
+
+    <div class="metric-grid">
+      <div class="metric-card anim">
+        <span class="metric-icon">🌡️</span>
+        <div class="metric-value" id="tempVal">-63<span class="metric-unit">°C</span></div>
+        <div class="metric-label">SURFACE TEMP</div>
+      </div>
+      <div class="metric-card anim">
+        <span class="metric-icon">🌬️</span>
+        <div class="metric-value" id="pressVal">680<span class="metric-unit">Pa</span></div>
+        <div class="metric-label">ATMOSPHERE</div>
+      </div>
+      <div class="metric-card anim">
+        <span class="metric-icon">💨</span>
+        <div class="metric-value" id="windVal">12<span class="metric-unit">m/s</span></div>
+        <div class="metric-label">WIND SPEED</div>
+      </div>
+      <div class="metric-card highlight anim">
+        <span class="metric-icon">⚡</span>
+        <div class="metric-value" id="powerVal">84<span class="metric-unit">%</span></div>
+        <div class="metric-label">POWER LEVEL</div>
+      </div>
+    </div>
+
+    <div class="section-title">● CURRENT LOCATION</div>
+
+    <div class="location-block anim">
+      <div class="location-name" id="locationName">JEZERO CRATER</div>
+      <div class="location-coords">
+        <div><span>LAT</span>18.4°N</div>
+        <div><span>LON</span>77.7°E</div>
+        <div><span>ELEV</span>-2,560 m</div>
+        <div><span>SOL</span><span id="solDisplay">1468</span></div>
+        <div><span>DIST</span>24.8 km total</div>
+      </div>
+    </div>
+
+    <div class="section-title">● SAMPLE CACHE</div>
+
+    <div class="sample-counter">
+      <div class="sample-row">
+        <span class="sample-label">CORE SAMPLES</span>
+        <span class="sample-val" id="coreCount">23</span>
+      </div>
+      <div class="sample-row">
+        <span class="sample-label">REGOLITH</span>
+        <span class="sample-val green-text">8 CACHED</span>
+      </div>
+      <div class="sample-row">
+        <span class="sample-label">ORGANICS</span>
+        <span class="sample-val yellow-text">DETECTED</span>
+      </div>
+      <div class="sample-row">
+        <span class="sample-label">CACHE STATUS</span>
+        <span class="sample-val green-text">NOMINAL</span>
+      </div>
+      <div class="sample-row">
+        <span class="sample-label">RETURN DATE</span>
+        <span class="sample-val">2033 EST</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER PANEL -->
+  <main class="center-panel">
+
+    <!-- Mars Surface Map -->
+    <div class="mars-map">
+      <div class="mars-surface" id="marsSurface"></div>
+      <div class="mars-grid"></div>
+      <div class="mars-overlay"></div>
+      <div class="mars-hud"></div>
+      <div class="mars-label">MARS SURFACE — TOPOGRAPHIC OVERLAY</div>
+
+      <!-- Rover position markers -->
+      <div class="rover-marker" style="left:52%; top:38%;" id="persMarker">
+        <div class="rover-marker-ring"></div>
+        <div class="rover-marker-dot"></div>
+        <div class="rover-marker-label">PERSEVERANCE ◈ SOL 1468</div>
+      </div>
+
+      <div class="rover-marker" style="left:33%; top:55%;" id="curiMarker">
+        <div class="rover-marker-ring" style="animation-delay:1s; border-color: #ffc040;"></div>
+        <div class="rover-marker-dot" style="background: #ffc040; box-shadow: 0 0 15px #ffc040;"></div>
+        <div class="rover-marker-label" style="color:#ffc040;">CURIOSITY ◈ SOL 4160</div>
+      </div>
+
+      <!-- Discovery dots -->
+      <div class="discovery-marker" style="left:48%; top:35%;" title="Organic molecules detected"></div>
+      <div class="discovery-marker" style="left:55%; top:42%;" title="Water-bearing mineral found"></div>
+      <div class="discovery-marker old" style="left:38%; top:50%;" title="Sulfur deposits"></div>
+      <div class="discovery-marker old" style="left:30%; top:58%;" title="Mudstone formation"></div>
+      <div class="discovery-marker" style="left:61%; top:44%;" title="Ancient lakebed sediment"></div>
+      <div class="discovery-marker old" style="left:43%; top:62%;" title="Impact crater minerals"></div>
+
+      <!-- Legend -->
+      <div style="position:absolute; bottom:14px; left:16px; font-family:'Share Tech Mono'; font-size:8px; color:rgba(255,107,43,0.6); line-height:1.8;">
+        <div>● ROVER POSITION</div>
+        <div style="color:rgba(0,255,136,0.6);">● NEW DISCOVERY</div>
+        <div style="color:rgba(255,192,64,0.6);">● PAST DISCOVERY</div>
+      </div>
+
+      <div style="position:absolute; bottom:14px; right:16px; font-family:'Share Tech Mono'; font-size:8px; color:rgba(255,107,43,0.5); text-align:right; line-height:1.8;">
+        <div id="mapRoverInfo">ACTIVE: PERSEVERANCE</div>
+        <div>DISCOVERIES: 847 TOTAL</div>
+        <div>MAP REF: MOLA 2024</div>
+      </div>
+    </div>
+
+    <!-- Charts Bar -->
+    <div class="charts-bar">
+      <div class="mini-chart">
+        <div class="mini-chart-title">▸ TEMPERATURE VARIATION (SOL)</div>
+        <div class="mini-chart-wrap">
+          <canvas id="tempChart"></canvas>
+        </div>
+      </div>
+      <div class="mini-chart">
+        <div class="mini-chart-title">▸ ATMOSPHERE PRESSURE (SOL)</div>
+        <div class="mini-chart-wrap">
+          <canvas id="pressChart"></canvas>
+        </div>
+      </div>
+      <div class="mini-chart">
+        <div class="mini-chart-title">▸ POWER & BATTERY STATUS</div>
+        <div class="mini-chart-wrap">
+          <canvas id="powerChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel">
+    <div class="section-title">● INSTRUMENT STATUS</div>
+
+    <div>
+      <div class="instrument-row"><span class="inst-name">MASTCAM-Z</span><span class="inst-status inst-on">ACTIVE</span></div>
+      <div class="instrument-row"><span class="inst-name">MOXIE</span><span class="inst-status inst-on">ACTIVE</span></div>
+      <div class="instrument-row"><span class="inst-name">SHERLOC</span><span class="inst-status inst-standby">STANDBY</span></div>
+      <div class="instrument-row"><span class="inst-name">PIXL</span><span class="inst-status inst-on">ACTIVE</span></div>
+      <div class="instrument-row"><span class="inst-name">RIMFAX</span><span class="inst-status inst-on">ACTIVE</span></div>
+      <div class="instrument-row"><span class="inst-name">MEDA</span><span class="inst-status inst-on">ACTIVE</span></div>
+      <div class="instrument-row"><span class="inst-name">SuperCam</span><span class="inst-status inst-standby">STANDBY</span></div>
+    </div>
+
+    <div class="section-title" style="margin-top:4px;">● SURFACE ANALYSIS</div>
+
+    <table class="data-table">
+      <tr>
+        <th>COMPOUND</th>
+        <th>%COMP</th>
+        <th>STATUS</th>
+      </tr>
+      <tr><td>SiO₂</td><td class="val">45.2%</td><td>NOMINAL</td></tr>
+      <tr><td>Fe₂O₃</td><td class="val">18.4%</td><td>HIGH</td></tr>
+      <tr><td>Al₂O₃</td><td class="val">9.1%</td><td>NOMINAL</td></tr>
+      <tr><td>CaO</td><td class="val">6.3%</td><td>NOMINAL</td></tr>
+      <tr><td>MgO</td><td class="val">5.7%</td><td>NOMINAL</td></tr>
+      <tr><td>Organics</td><td class="val" style="color:var(--green);">TRACE</td><td style="color:var(--green);">⚡ FLAG</td></tr>
+    </table>
+
+    <div class="section-title" style="margin-top:4px;">● RECENT DISCOVERIES</div>
+
+    <div class="discovery-item anim">
+      <div class="discovery-title">Organic Molecules — Jezero Floor</div>
+      <div class="discovery-meta">SOL 1468 · SHERLOC INSTRUMENT</div>
+      <span class="discovery-tag bio">BIOSIGNATURE CANDIDATE</span>
+    </div>
+
+    <div class="discovery-item anim">
+      <div class="discovery-title">Hydrated Silica Vein Network</div>
+      <div class="discovery-meta">SOL 1451 · PIXL INSTRUMENT</div>
+      <span class="discovery-tag geo">GEOCHEMISTRY</span>
+    </div>
+
+    <div class="discovery-item anim">
+      <div class="discovery-title">Carbonate-Rich Rock Exposure</div>
+      <div class="discovery-meta">SOL 1440 · MASTCAM-Z</div>
+      <span class="discovery-tag geo">MINERALOGY</span>
+    </div>
+
+    <div class="discovery-item anim">
+      <div class="discovery-title">Ancient River Delta Sediment Layer</div>
+      <div class="discovery-meta">SOL 1398 · SuperCam LIBS</div>
+      <span class="discovery-tag">GEOLOGY</span>
+    </div>
+
+    <div class="section-title" style="margin-top:4px;">● COMMUNICATION</div>
+
+    <div class="sample-counter">
+      <div class="sample-row"><span class="sample-label">SIGNAL DELAY</span><span class="sample-val">12.4 MIN</span></div>
+      <div class="sample-row"><span class="sample-label">DATA RATE</span><span class="sample-val">2 Mbit/s</span></div>
+      <div class="sample-row"><span class="sample-label">MRO RELAY</span><span class="sample-val green-text">CONNECTED</span></div>
+      <div class="sample-row"><span class="sample-label">NEXT PASS</span><span class="sample-val">02:34 UTC</span></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+  // Rover data
+  const roverData = {
+    perseverance: {
+      temp: '-63°C', press: '680 Pa', wind: '12 m/s', power: '84%',
+      sol: '1468', location: 'JEZERO CRATER', cores: 23,
+      imgStyle: `url('https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/PIA23764-MarsRoverPerseverance-20210218.jpg/1200px-PIA23764-MarsRoverPerseverance-20210218.jpg') center/cover`,
+      imgLabel: 'PERSEVERANCE · JEZERO CRATER',
+    },
+    curiosity: {
+      temp: '-55°C', press: '732 Pa', wind: '8 m/s', power: '71%',
+      sol: '4160', location: 'GALE CRATER', cores: 0,
+      imgStyle: `url('https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Curiosity_Self-Portrait_at_%27Big_Sky%27_Drilling_Site.jpg/1200px-Curiosity_Self-Portrait_at_%27Big_Sky%27_Drilling_Site.jpg') center/cover`,
+      imgLabel: 'CURIOSITY · GALE CRATER',
+    },
+    ingenuity: {
+      temp: '-70°C', press: '651 Pa', wind: '15 m/s', power: '41%',
+      sol: '1401', location: 'VALINOR HILLS', cores: 0,
+      imgStyle: `url('https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Ingenuity_on_Mars_%28cropped%29.jpg/1200px-Ingenuity_on_Mars_%28cropped%29.jpg') center/cover`,
+      imgLabel: 'INGENUITY · GROUNDED',
+    },
+  };
+
+  function selectRover(tab, name) {
+    document.querySelectorAll('.rover-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const d = roverData[name];
+    document.getElementById('tempVal').innerHTML = d.temp.replace('°C','<span class="metric-unit">°C</span>');
+    document.getElementById('pressVal').innerHTML = d.press.replace(' Pa','<span class="metric-unit">Pa</span>');
+    document.getElementById('windVal').innerHTML = d.wind.replace(' m/s','<span class="metric-unit">m/s</span>');
+    document.getElementById('powerVal').innerHTML = d.power.replace('%','<span class="metric-unit">%</span>');
+    document.getElementById('solDay').textContent = d.sol;
+    document.getElementById('solDisplay').textContent = d.sol;
+    document.getElementById('marsTemp').textContent = d.temp;
+    document.getElementById('locationName').textContent = d.location;
+    document.getElementById('coreCount').textContent = d.cores;
+    document.getElementById('roverImg').style.background = d.imgStyle;
+    document.getElementById('roverImgLabel').textContent = d.imgLabel;
+    document.getElementById('mapRoverInfo').textContent = 'ACTIVE: ' + name.toUpperCase();
+  }
+
+  // Init rover image
+  document.getElementById('roverImg').style.background = roverData.perseverance.imgStyle;
+
+  // Charts
+  const hours = Array.from({length: 24}, (_, i) => i);
+
+  // Temperature chart
+  new Chart(document.getElementById('tempChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [{
+        data: hours.map(h => -80 + Math.sin(h / 3.8) * 25 + Math.random() * 8),
+        borderColor: '#ff6b2b',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: true,
+        backgroundColor: 'rgba(255,107,43,0.08)',
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      animation: { duration: 1200 },
+      scales: {
+        x: { ticks: { color: '#663322', font: { family: "'Share Tech Mono'", size: 7 }, maxTicksLimit: 6 }, grid: { color: 'rgba(255,107,43,0.06)' }, border: { color: 'rgba(255,107,43,0.15)' } },
+        y: { ticks: { color: '#663322', font: { family: "'Share Tech Mono'", size: 7 } }, grid: { color: 'rgba(255,107,43,0.06)' }, border: { color: 'rgba(255,107,43,0.15)' } }
+      }
+    }
+  });
+
+  // Pressure chart
+  new Chart(document.getElementById('pressChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [{
+        data: hours.map(() => 650 + Math.random() * 100),
+        borderColor: '#ffc040',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: true,
+        backgroundColor: 'rgba(255,192,64,0.06)',
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      animation: { duration: 1200 },
+      scales: {
+        x: { ticks: { color: '#663322', font: { family: "'Share Tech Mono'", size: 7 }, maxTicksLimit: 6 }, grid: { color: 'rgba(255,107,43,0.06)' }, border: { color: 'rgba(255,107,43,0.15)' } },
+        y: { ticks: { color: '#663322', font: { family: "'Share Tech Mono'", size: 7 } }, grid: { color: 'rgba(255,107,43,0.06)' }, border: { color: 'rgba(255,107,43,0.15)' } }
+      }
+    }
+  });
+
+  // Power chart
+  new Chart(document.getElementById('powerChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+      datasets: [{
+        label: 'BATTERY %',
+        data: [88, 82, 86, 79, 84, 76, 84],
+        backgroundColor: 'rgba(0,255,136,0.25)',
+        borderColor: '#00ff88',
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      animation: { duration: 1200 },
+      scales: {
+        x: { ticks: { color: '#663322', font: { family: "'Share Tech Mono'", size: 7 } }, grid: { color: 'rgba(255,107,43,0.06)' }, border: { color: 'rgba(255,107,43,0.15)' } },
+        y: { min: 0, max: 100, ticks: { color: '#663322', font: { family: "'Share Tech Mono'", size: 7 } }, grid: { color: 'rgba(255,107,43,0.06)' }, border: { color: 'rgba(255,107,43,0.15)' } }
+      }
+    }
+  });
+
+  // Simulate temperature fluctuation
+  setInterval(() => {
+    const temp = Math.round(-63 + (Math.random() - 0.5) * 10);
+    document.getElementById('marsTemp').textContent = temp + '°C';
+  }, 4000);
+</script>
+<script>
+  if (typeof ArtemisNexus !== 'undefined' && document.getElementById('navMount')) {
+    document.getElementById('navMount').innerHTML = ArtemisNexus.renderHeader('mars');
+  }
+</script>
+</body>
+</html>
