@@ -1,4 +1,4 @@
-ArtemisNexus – Space Intelligence & Exploration Platform 🌌
+**ArtemisNexus – Space Intelligence & Exploration Platform 🌌**
 
 ArtemisNexus is a data-driven space intelligence platform that brings together multiple space domains into a unified, interactive system for exploration, monitoring, and analysis.
 
