@@ -45,21 +45,24 @@ ArtemisNexus is designed not just as a viewer but as an intelligent exploration 
 
 It focuses on:
 
-Real-time data interpretation
-Multi-source data integration
-Interactive visual understanding
-System reliability under API constraints
+Real-time data interpretation, Multi-source data integration, Interactive visual understanding, System reliability under API constraint
+
+
 📡 Live Data Integrations
 NASA APIs → Near-Earth Objects, Astronomy data
 Open Notify → ISS tracking and astronaut data
 SpaceX API → Launch and mission telemetry
 Solar System APIs → Orbital and planetary datasets
+
+
 ⚙️ Technologies Used
+
 💻 Frontend
 HTML5, CSS3, JavaScript (Vanilla)
 Glassmorphism + Neon UI Design
 Chart.js for dynamic data visualization
 Canvas API for orbital simulations
+
 ⚙️ Backend
 Python (Flask) → API handling & proxy
 Java (Spring Boot) → system architecture
